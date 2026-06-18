@@ -1,13 +1,177 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MediaType {
+  movie
+  tv
+}
+
+enum DiaryVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model User {
+  id        String  @id @default(cuid())
+  name      String?
+  email     String? @unique
+  image     String?
+
+  username String? @unique @db.VarChar(24)
+  bio      String? @db.VarChar(160)
+  socialLink String?
+
+  role Role @default(USER)
+
+  isPublic Boolean @default(true)
+  defaultDiaryVisibility DiaryVisibility @default(PRIVATE)
+  onboardingCompleted Boolean @default(false)
+
+  emailVerified DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  suspendedAt DateTime?
+
+  accounts Account[]
+  sessions Session[]
+
+  diaryEntries DiaryEntry[]
+  watchlistItems WatchlistItem[]
+  featuredFilms FeaturedFilm[]
+
+  @@index([role])
+  @@index([deletedAt])
+  @@index([suspendedAt])
+}
+
+model DiaryEntry {
+  id String @id @default(cuid())
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tmdbId Int
+  mediaType MediaType
+
+  title String
+  posterPath String?
+
+  rating Float?
+  review String? @db.VarChar(1000)
+  privateNotes String? @db.VarChar(1000)
+  spoiler Boolean @default(false)
+
+  isPublic Boolean @default(false)
+
+  watchedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, watchedAt])
+  @@index([userId, isPublic, watchedAt])
+  @@index([userId, deletedAt])
+  @@index([tmdbId, mediaType])
+}
+
+model WatchlistItem {
+  id String @id @default(cuid())
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tmdbId Int
+  mediaType MediaType
+
+  title String
+  posterPath String?
+
+  addedAt DateTime @default(now())
+  deletedAt DateTime?
+
+  @@unique([userId, tmdbId, mediaType])
+  @@index([userId, addedAt])
+  @@index([userId, deletedAt])
+}
+
+model FeaturedFilm {
+  id String @id @default(cuid())
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tmdbId Int
+  mediaType MediaType
+
+  title String
+  posterPath String?
+
+  position Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, position])
+  @@unique([userId, tmdbId, mediaType])
+  @@index([userId, position])
+}
+
+/**
+ * NextAuth / Auth.js Prisma Adapter models
+ */
+
+model Account {
+  id String @id @default(cuid())
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type String
+  provider String
+  providerAccountId String
+
+  refresh_token String?
+  access_token String?
+  expires_at Int?
+  token_type String?
+  scope String?
+  id_token String?
+  session_state String?
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id String @id @default(cuid())
+
+  sessionToken String @unique
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expires DateTime
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token String @unique
+  expires DateTime
+
+  @@unique([identifier, token])
 }
