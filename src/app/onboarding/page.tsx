@@ -30,7 +30,7 @@ export default async function OnboardingPage() {
   }
 
   if (user.onboardingCompleted) {
-    redirect("/");
+    redirect("/home");
   }
 
   return (

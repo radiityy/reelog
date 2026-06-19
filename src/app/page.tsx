@@ -1,3 +1,8 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 
 const marqueeItems = [
@@ -12,7 +17,31 @@ const marqueeItems = [
 
 const topFive = ["01", "02", "03", "04", "05"];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: session.user.id,
+      },
+      select: {
+        username: true,
+        onboardingCompleted: true,
+      },
+    });
+
+    if (!user) {
+      redirect("/login");
+    }
+
+    if (!user.onboardingCompleted || !user.username) {
+      redirect("/onboarding");
+    }
+
+    redirect("/home");
+  }
+  
   return (
     <main className="min-h-screen overflow-hidden bg-[#0C0A08] text-[#EDE8DE]">
       <header className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-6 py-7 md:px-14">

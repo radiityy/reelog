@@ -145,7 +145,7 @@ export function OnboardingForm({
         return;
       }
 
-      router.replace("/");
+      router.replace("/home");
       router.refresh();
     } catch {
       setSubmitError("Unable to connect to the server.");
