@@ -1,5 +1,7 @@
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
+export type TmdbMediaType = "movie" | "tv";
+
 type TmdbRawSearchResult = {
   id: number;
   media_type: "movie" | "tv" | "person";
@@ -10,6 +12,7 @@ type TmdbRawSearchResult = {
   release_date?: string;
   first_air_date?: string;
   vote_average?: number;
+  popularity?: number;
 };
 
 type TmdbMultiSearchResponse = {
@@ -19,14 +22,27 @@ type TmdbMultiSearchResponse = {
   total_results: number;
 };
 
+type TmdbRawTitleDetails = {
+  id: number;
+  title?: string;
+  name?: string;
+  overview?: string;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+};
+
 export type TmdbSearchResult = {
   id: number;
-  mediaType: "movie" | "tv";
+  mediaType: TmdbMediaType;
   title: string;
   overview: string;
   posterPath: string | null;
   releaseDate: string | null;
   rating: number;
+  popularity: number;
 };
 
 export type TmdbSearchResponse = {
@@ -34,6 +50,17 @@ export type TmdbSearchResponse = {
   totalPages: number;
   totalResults: number;
   results: TmdbSearchResult[];
+};
+
+export type TmdbTitleDetails = {
+  id: number;
+  mediaType: TmdbMediaType;
+  title: string;
+  overview: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  releaseDate: string | null;
+  rating: number;
 };
 
 function getTmdbToken() {
@@ -48,12 +75,39 @@ function getTmdbToken() {
   return token;
 }
 
-export function getTmdbPosterUrl(posterPath: string | null) {
+async function fetchTmdb<T>(path: string): Promise<T> {
+  const response = await fetch(`${TMDB_BASE_URL}${path}`, {
+    headers: {
+      Authorization: `Bearer ${getTmdbToken()}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+
+    console.error("TMDB request failed:", {
+      path,
+      status: response.status,
+      body,
+    });
+
+    throw new Error(`TMDB request failed with status ${response.status}.`);
+  }
+
+  return (await response.json()) as T;
+}
+
+export function getTmdbPosterUrl(
+  posterPath: string | null,
+  size: "w342" | "w500" = "w342",
+) {
   if (!posterPath) {
     return null;
   }
 
-  return `https://image.tmdb.org/t/p/w342${posterPath}`;
+  return `https://image.tmdb.org/t/p/${size}${posterPath}`;
 }
 
 export async function searchTmdb(
@@ -78,36 +132,16 @@ export async function searchTmdb(
     page: String(page),
   });
 
-  const response = await fetch(
-    `${TMDB_BASE_URL}/search/multi?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${getTmdbToken()}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    },
+  const data = await fetchTmdb<TmdbMultiSearchResponse>(
+    `/search/multi?${params.toString()}`,
   );
-
-  if (!response.ok) {
-    const responseBody = await response.text();
-
-    console.error("TMDB search failed:", {
-      status: response.status,
-      responseBody,
-    });
-
-    throw new Error(`TMDB request failed with status ${response.status}.`);
-  }
-
-  const data = (await response.json()) as TmdbMultiSearchResponse;
 
   const results = data.results
     .filter(
       (
         item,
       ): item is TmdbRawSearchResult & {
-        media_type: "movie" | "tv";
+        media_type: TmdbMediaType;
       } => item.media_type === "movie" || item.media_type === "tv",
     )
     .map<TmdbSearchResult>((item) => ({
@@ -127,6 +161,10 @@ export async function searchTmdb(
         typeof item.vote_average === "number"
           ? item.vote_average
           : 0,
+      popularity:
+        typeof item.popularity === "number"
+          ? item.popularity
+          : 0,
     }));
 
   return {
@@ -134,5 +172,34 @@ export async function searchTmdb(
     totalPages: data.total_pages,
     totalResults: data.total_results,
     results,
+  };
+}
+
+export async function getTmdbTitleDetails(
+  mediaType: TmdbMediaType,
+  tmdbId: number,
+): Promise<TmdbTitleDetails> {
+  const data = await fetchTmdb<TmdbRawTitleDetails>(
+    `/${mediaType}/${tmdbId}?language=en-US`,
+  );
+
+  return {
+    id: data.id,
+    mediaType,
+    title:
+      mediaType === "movie"
+        ? data.title ?? "Untitled film"
+        : data.name ?? "Untitled series",
+    overview: data.overview?.trim() ?? "",
+    posterPath: data.poster_path ?? null,
+    backdropPath: data.backdrop_path ?? null,
+    releaseDate:
+      mediaType === "movie"
+        ? data.release_date || null
+        : data.first_air_date || null,
+    rating:
+      typeof data.vote_average === "number"
+        ? data.vote_average
+        : 0,
   };
 }

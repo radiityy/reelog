@@ -209,13 +209,12 @@ function SearchResultCard({
         </span>
       </div>
 
-      <button
-        type="button"
-        disabled
-        className="mt-3 w-full cursor-not-allowed rounded-full border border-[#302C28] px-3 py-2 text-xs text-[#625D58]"
-      >
-        Select title
-      </button>
+        <Link
+        href={`/log/${item.mediaType}/${item.id}`}
+        className="mt-3 block w-full rounded-full border border-[#C84B18]/50 px-3 py-2 text-center text-xs font-medium text-[#C84B18] transition hover:bg-[#C84B18] hover:text-white"
+        >
+        Log this title
+        </Link>
     </article>
   );
 }

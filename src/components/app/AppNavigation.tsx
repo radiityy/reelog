@@ -88,7 +88,7 @@ const navigationItems = [
   {
     label: "Diary",
     href: "/diary",
-    available: false,
+    available: true,
     icon: DiaryIcon,
   },
   {
@@ -192,31 +192,57 @@ export function AppNavigation({
         })}
       </div>
 
-      <p className="mb-3 mt-9 px-3 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4A4642]">
-        Your library
-      </p>
+            <p className="mb-3 mt-9 px-3 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4A4642]">
+            Your library
+            </p>
 
-      <div className="space-y-1">
-        {navigationItems.slice(2).map((item) => {
-          const Icon = item.icon;
+            <div className="space-y-1">
+            {navigationItems.slice(2).map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
 
-          return (
-            <div
-              key={item.href}
-              className="flex cursor-not-allowed items-center justify-between rounded-md px-3 py-3 text-[#514C47]"
-            >
-              <div className="flex items-center gap-4">
-                <Icon className="h-5 w-5" />
-                <span className="text-sm">{item.label}</span>
-              </div>
+                if (!item.available) {
+                return (
+                    <div
+                    key={item.href}
+                    className="flex cursor-not-allowed items-center justify-between rounded-md px-3 py-3 text-[#514C47]"
+                    >
+                    <div className="flex items-center gap-4">
+                        <Icon className="h-5 w-5" />
+                        <span className="text-sm">{item.label}</span>
+                    </div>
 
-              <span className="font-mono text-[7px] uppercase tracking-[0.1em]">
-                Soon
-              </span>
-            </div>
-          );
-        })}
-      </div>
+                    <span className="font-mono text-[7px] uppercase tracking-[0.1em]">
+                        Soon
+                    </span>
+                    </div>
+                );
+                }
+
+                return (
+                <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={[
+                    "flex items-center gap-4 rounded-md px-3 py-3 text-sm font-medium transition",
+                    active
+                        ? "bg-[#211E1B] text-[#EDE8DE]"
+                        : "text-[#8A8580] hover:bg-[#171411] hover:text-[#EDE8DE]",
+                    ].join(" ")}
+                >
+                    <Icon
+                    className={[
+                        "h-5 w-5",
+                        active ? "text-[#C84B18]" : "",
+                    ].join(" ")}
+                    />
+
+                    {item.label}
+                </Link>
+                );
+            })}
+        </div>
     </nav>
   );
 }

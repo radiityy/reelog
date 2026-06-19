@@ -29,22 +29,15 @@ model User {
   email String? @unique
   image String?
 
-  // Diisi setelah login Google melalui onboarding.
-  // Nullable agar akun OAuth tetap dapat dibuat sebelum username dipilih.
   username   String? @unique @db.VarChar(24)
   bio        String? @db.VarChar(160)
   socialLink String? @db.VarChar(500)
 
   role Role @default(USER)
 
-  // Visibility profil publik.
-  // Default false agar akun baru tetap private.
-  isPublic Boolean @default(false)
-
-  // Digunakan nanti di Account Settings sebagai nilai awal diary baru.
+  isPublic               Boolean         @default(false)
   defaultDiaryVisibility DiaryVisibility @default(PRIVATE)
-
-  onboardingCompleted Boolean @default(false)
+  onboardingCompleted    Boolean         @default(false)
 
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
@@ -80,9 +73,8 @@ model DiaryEntry {
   privateNotes String? @db.VarChar(1000)
   spoiler      Boolean @default(false)
 
-  // Bisa diubah per diary.
-  // Default aman: hanya pemilik yang dapat melihat.
-  isPublic Boolean @default(false)
+  isPublic       Boolean @default(false)
+  reviewIsPublic Boolean @default(false)
 
   watchedAt DateTime  @default(now())
   createdAt DateTime  @default(now())
@@ -91,6 +83,7 @@ model DiaryEntry {
 
   @@index([userId, watchedAt])
   @@index([userId, isPublic, watchedAt])
+  @@index([userId, reviewIsPublic, watchedAt])
   @@index([userId, deletedAt])
   @@index([tmdbId, mediaType])
 }
@@ -127,7 +120,6 @@ model FeaturedFilm {
   title      String
   posterPath String?
 
-  // Nilai 1 sampai 5 divalidasi di backend.
   position Int
 
   createdAt DateTime @default(now())
@@ -137,10 +129,6 @@ model FeaturedFilm {
   @@unique([userId, tmdbId, mediaType])
   @@index([userId, position])
 }
-
-/**
- * NextAuth v4 Prisma Adapter models
- */
 
 model Account {
   id String @id @default(cuid())
