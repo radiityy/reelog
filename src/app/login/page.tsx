@@ -102,7 +102,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            onClick={() => signIn("google", { callbackUrl: "/" })}
+            onClick={() => signIn("google", { callbackUrl: "/onboarding" })}
             className="mt-10 flex w-full items-center justify-center gap-3 rounded-[3px] bg-[#EDE8DE] px-6 py-4 text-sm font-medium text-[#1A1410] transition hover:bg-[#F4EFE5]"
           >
             <GoogleIcon />

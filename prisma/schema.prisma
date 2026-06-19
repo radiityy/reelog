@@ -24,33 +24,39 @@ enum DiaryVisibility {
 }
 
 model User {
-  id        String  @id @default(cuid())
-  name      String?
-  email     String? @unique
-  image     String?
+  id    String  @id @default(cuid())
+  name  String?
+  email String? @unique
+  image String?
 
-  username String? @unique @db.VarChar(24)
-  bio      String? @db.VarChar(160)
-  socialLink String?
+  // Diisi setelah login Google melalui onboarding.
+  // Nullable agar akun OAuth tetap dapat dibuat sebelum username dipilih.
+  username   String? @unique @db.VarChar(24)
+  bio        String? @db.VarChar(160)
+  socialLink String? @db.VarChar(500)
 
   role Role @default(USER)
 
-  isPublic Boolean @default(true)
+  // Visibility profil publik.
+  // Default false agar akun baru tetap private.
+  isPublic Boolean @default(false)
+
+  // Digunakan nanti di Account Settings sebagai nilai awal diary baru.
   defaultDiaryVisibility DiaryVisibility @default(PRIVATE)
+
   onboardingCompleted Boolean @default(false)
 
   emailVerified DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-  suspendedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  suspendedAt   DateTime?
 
-  accounts Account[]
-  sessions Session[]
-
-  diaryEntries DiaryEntry[]
+  accounts       Account[]
+  sessions       Session[]
+  diaryEntries   DiaryEntry[]
   watchlistItems WatchlistItem[]
-  featuredFilms FeaturedFilm[]
+  featuredFilms  FeaturedFilm[]
 
   @@index([role])
   @@index([deletedAt])
@@ -61,24 +67,26 @@ model DiaryEntry {
   id String @id @default(cuid())
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tmdbId Int
+  tmdbId    Int
   mediaType MediaType
 
-  title String
+  title      String
   posterPath String?
 
-  rating Float?
-  review String? @db.VarChar(1000)
+  rating       Float?
+  review       String? @db.VarChar(1000)
   privateNotes String? @db.VarChar(1000)
-  spoiler Boolean @default(false)
+  spoiler      Boolean @default(false)
 
+  // Bisa diubah per diary.
+  // Default aman: hanya pemilik yang dapat melihat.
   isPublic Boolean @default(false)
 
-  watchedAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  watchedAt DateTime  @default(now())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([userId, watchedAt])
@@ -91,15 +99,15 @@ model WatchlistItem {
   id String @id @default(cuid())
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tmdbId Int
+  tmdbId    Int
   mediaType MediaType
 
-  title String
+  title      String
   posterPath String?
 
-  addedAt DateTime @default(now())
+  addedAt   DateTime  @default(now())
   deletedAt DateTime?
 
   @@unique([userId, tmdbId, mediaType])
@@ -111,14 +119,15 @@ model FeaturedFilm {
   id String @id @default(cuid())
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tmdbId Int
+  tmdbId    Int
   mediaType MediaType
 
-  title String
+  title      String
   posterPath String?
 
+  // Nilai 1 sampai 5 divalidasi di backend.
   position Int
 
   createdAt DateTime @default(now())
@@ -130,25 +139,25 @@ model FeaturedFilm {
 }
 
 /**
- * NextAuth / Auth.js Prisma Adapter models
+ * NextAuth v4 Prisma Adapter models
  */
 
 model Account {
   id String @id @default(cuid())
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  type String
-  provider String
+  type              String
+  provider          String
   providerAccountId String
 
   refresh_token String?
-  access_token String?
-  expires_at Int?
-  token_type String?
-  scope String?
-  id_token String?
+  access_token  String?
+  expires_at    Int?
+  token_type    String?
+  scope         String?
+  id_token      String?
   session_state String?
 
   @@unique([provider, providerAccountId])
@@ -161,7 +170,7 @@ model Session {
   sessionToken String @unique
 
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   expires DateTime
 
@@ -170,8 +179,8 @@ model Session {
 
 model VerificationToken {
   identifier String
-  token String @unique
-  expires DateTime
+  token      String   @unique
+  expires    DateTime
 
   @@unique([identifier, token])
 }
