@@ -3,9 +3,12 @@
 import Link from "next/link";
 import {
   type FormEvent,
+  type ReactNode,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+
+import { SettingsAvatarEditor } from "@/components/settings/SettingsAvatarEditor";
 
 type DiaryVisibility = "PRIVATE" | "PUBLIC";
 
@@ -15,6 +18,7 @@ type AccountSettingsFormProps = {
     username: string;
     email: string;
     image: string | null;
+    hasCustomAvatar: boolean;
     bio: string;
     socialLink: string;
     isPublic: boolean;
@@ -45,10 +49,6 @@ export function AccountSettingsForm({
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const avatarInitial = initialValues.username
-    .charAt(0)
-    .toUpperCase();
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -102,22 +102,17 @@ export function AccountSettingsForm({
     <form onSubmit={handleSubmit}>
       <section className="rounded-xl border border-[#2B2723] bg-[#191613] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div
-            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-2xl font-bold text-white"
-            style={
-              initialValues.image
-                ? {
-                    backgroundImage: `url("${initialValues.image}")`,
-                  }
-                : undefined
+          <SettingsAvatarEditor
+            username={initialValues.username}
+            initialAvatarUrl={initialValues.image}
+            initialHasCustomAvatar={
+              initialValues.hasCustomAvatar
             }
-          >
-            {!initialValues.image ? avatarInitial : null}
-          </div>
+          />
 
           <div className="min-w-0">
             <h2 className="truncate text-xl font-semibold text-[#F4F1EB]">
-              {initialValues.name || `@${initialValues.username}`}
+              {name || `@${initialValues.username}`}
             </h2>
 
             <p className="mt-1 text-sm font-medium text-[#E45A1C]">
@@ -180,10 +175,7 @@ export function AccountSettingsForm({
             />
           </Field>
 
-          <Field
-            label="Bio"
-            helper={`${bio.length}/160`}
-          >
+          <Field label="Bio" helper={`${bio.length}/160`}>
             <textarea
               value={bio}
               onChange={(event) => setBio(event.target.value)}
@@ -207,7 +199,7 @@ export function AccountSettingsForm({
               }
               maxLength={500}
               disabled={isSubmitting}
-              placeholder="https://instagram.com/username"
+              placeholder="https://github.com/username"
               className="w-full rounded-lg border border-[#302C28] bg-[#100E0C] px-4 py-3 text-sm text-[#F4F1EB] outline-none transition placeholder:text-[#625D58] focus:border-[#C84B18] disabled:cursor-not-allowed disabled:opacity-50"
             />
           </Field>
@@ -233,7 +225,7 @@ export function AccountSettingsForm({
             disabled={isSubmitting}
             privateTitle="Private profile"
             publicTitle="Public profile"
-            privateDescription="Other people cannot open your profile. You can still preview it yourself."
+            privateDescription="Other people cannot open your profile, you can still preview it yourself."
             publicDescription="Anyone with your profile link can view your public diary activity and public reviews."
           />
         </div>
@@ -266,8 +258,8 @@ export function AccountSettingsForm({
             disabled={isSubmitting}
             privateTitle="Private by default"
             publicTitle="Public by default"
-            privateDescription="New diary entries begin as private. You can still change each entry before saving."
-            publicDescription="New diary entries begin as public. Review visibility is still selected separately."
+            privateDescription="New diary entries begin as private, uou can still change each entry before saving."
+            publicDescription="New diary entries begin as public, review visibility is still selected separately."
           />
         </div>
       </section>
@@ -304,7 +296,7 @@ function Field({
 }: {
   label: string;
   helper?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div>

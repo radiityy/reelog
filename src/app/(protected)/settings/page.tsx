@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
 import { AccountSettingsForm } from "@/components/settings/AccountSettingsForm";
+import { getUserAvatarUrl } from "@/lib/avatar";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -24,6 +25,7 @@ export default async function SettingsPage() {
       username: true,
       email: true,
       image: true,
+      avatarPath: true,
       bio: true,
       socialLink: true,
       isPublic: true,
@@ -34,6 +36,11 @@ export default async function SettingsPage() {
   if (!user?.username || !user.email) {
     redirect("/onboarding");
   }
+
+  const avatarUrl = getUserAvatarUrl(
+    user.avatarPath,
+    user.image,
+  );
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -53,7 +60,8 @@ export default async function SettingsPage() {
             name: user.name ?? "",
             username: user.username,
             email: user.email,
-            image: user.image,
+            image: avatarUrl,
+            hasCustomAvatar: Boolean(user.avatarPath),
             bio: user.bio ?? "",
             socialLink: user.socialLink ?? "",
             isPublic: user.isPublic,

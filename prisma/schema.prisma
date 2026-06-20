@@ -29,6 +29,8 @@ model User {
   email String? @unique
   image String?
 
+  avatarPath String? @db.VarChar(500)
+
   username   String? @unique @db.VarChar(24)
   bio        String? @db.VarChar(160)
   socialLink String? @db.VarChar(500)
