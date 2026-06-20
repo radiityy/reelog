@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 import {
-  type FormEvent,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { signOut } from "next-auth/react";
-import {
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+
+import { GlobalSearch } from "@/components/app/GlobalSearch";
 
 type HeaderUser = {
   username?: string | null;
@@ -33,16 +29,8 @@ export function AppHeader({
   name,
   image,
 }: AppHeaderProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const [query, setQuery] = useState(
-    searchParams.get("q") ?? "",
-  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -61,10 +49,6 @@ export function AppHeader({
   )
     .charAt(0)
     .toUpperCase();
-
-  useEffect(() => {
-    setQuery(searchParams.get("q") ?? "");
-  }, [searchParams]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -94,35 +78,6 @@ export function AppHeader({
     };
   }, []);
 
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const normalizedQuery = query.trim();
-
-    if (!normalizedQuery) {
-      router.push("/search");
-      return;
-    }
-
-    router.push(
-      `/search?q=${encodeURIComponent(normalizedQuery)}`,
-    );
-  }
-
-  function handleClearSearch() {
-    setQuery("");
-
-    if (pathname === "/search" && searchParams.get("q")) {
-      router.replace("/search", {
-        scroll: false,
-      });
-    }
-
-    window.requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
-  }
-
   function closeMenu() {
     setIsMenuOpen(false);
   }
@@ -138,36 +93,9 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-30 border-b border-[#27231F] bg-[#100E0C]/95 backdrop-blur-xl">
       <div className="flex h-[88px] items-center gap-4 px-5 md:px-8">
-        <form
-          onSubmit={handleSearch}
-          className="flex min-w-0 flex-1"
-        >
-          <div className="flex h-12 w-full max-w-4xl items-center rounded-full border border-[#302C28] bg-[#211E1B] px-4 transition focus-within:border-[#4A4540] focus-within:bg-[#25211E]">
-            <SearchIcon className="h-5 w-5 shrink-0 text-[#8A8580]" />
-
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search films and series"
-              aria-label="Search films and series"
-              className="min-w-0 flex-1 bg-transparent px-4 text-sm font-medium text-[#F4F1EB] outline-none placeholder:font-normal placeholder:text-[#625D58] [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden"
-            />
-
-            {query ? (
-              <button
-                type="button"
-                onClick={handleClearSearch}
-                aria-label="Clear search"
-                title="Clear search"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#716B65] transition hover:bg-[#37322E] hover:text-[#F4F1EB] focus:outline-none focus:ring-2 focus:ring-[#C84B18]/40"
-              >
-                <CloseIcon className="h-[15px] w-[15px]" />
-              </button>
-            ) : null}
-          </div>
-        </form>
+        <div className="min-w-0 flex-1">
+          <GlobalSearch />
+        </div>
 
         <div ref={menuRef} className="relative shrink-0">
           <button
@@ -260,58 +188,6 @@ export function AppHeader({
         </div>
       </div>
     </header>
-  );
-}
-
-function SearchIcon({
-  className = "",
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      className={className}
-    >
-      <circle
-        cx="11"
-        cy="11"
-        r="6.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-
-      <path
-        d="m16 16 4 4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function CloseIcon({
-  className = "",
-}: {
-  className?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      className={className}
-    >
-      <path
-        d="M7.5 7.5 16.5 16.5M16.5 7.5l-9 9"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 
