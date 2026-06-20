@@ -94,7 +94,7 @@ const navigationItems = [
   {
     label: "Watchlist",
     href: "/watchlist",
-    available: false,
+    available: true,
     icon: WatchlistIcon,
   },
 ];

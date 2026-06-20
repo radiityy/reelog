@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/app/AppHeader";
 import { AppNavigation } from "@/components/app/AppNavigation";
 import { UserMenu } from "@/components/app/UserMenu";
+import { getUserAvatarUrl } from "@/lib/avatar";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -30,7 +31,9 @@ export default async function ProtectedLayout({
     },
     select: {
       username: true,
+      name: true,
       image: true,
+      avatarPath: true,
       onboardingCompleted: true,
     },
   });
@@ -42,6 +45,11 @@ export default async function ProtectedLayout({
   if (!user.onboardingCompleted || !user.username) {
     redirect("/onboarding");
   }
+
+  const avatarUrl = getUserAvatarUrl(
+    user.avatarPath,
+    user.image,
+  );
 
   return (
     <div className="min-h-screen bg-[#080706] text-[#EDE8DE]">
@@ -61,11 +69,18 @@ export default async function ProtectedLayout({
           <AppNavigation />
         </div>
 
-        <UserMenu username={user.username} image={user.image} />
+        <UserMenu
+          username={user.username}
+          image={avatarUrl}
+        />
       </aside>
 
       <div className="min-h-screen bg-[#12100E] lg:pl-[232px]">
-        <AppHeader username={user.username} image={user.image} />
+        <AppHeader
+          username={user.username}
+          name={user.name}
+          image={avatarUrl}
+        />
 
         <main className="mx-auto min-h-[calc(100vh-72px)] w-full max-w-[1600px] px-5 pb-28 pt-8 sm:px-8 lg:px-10 lg:pb-12">
           {children}
