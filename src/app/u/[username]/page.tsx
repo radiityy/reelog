@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 
 import { FormattedReview } from "@/components/diary/FormattedReview";
+import { ShareProfileButton } from "@/components/profile/ShareProfileButton";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTmdbPosterUrl } from "@/lib/tmdb";
@@ -165,30 +166,21 @@ export default async function PublicProfilePage({
             Reelog
           </Link>
 
-          <div className="flex items-center gap-3">
-            {isOwner ? (
-              <Link
-                href="/home"
-                className="rounded-full border border-[#302C28] px-4 py-2 text-sm font-medium text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
-              >
-                Back to app
-              </Link>
-            ) : session?.user?.id ? (
-              <Link
-                href="/home"
-                className="rounded-full bg-[#C84B18] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
-              >
-                Open Reelog
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="rounded-full bg-[#C84B18] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
-              >
-                Sign in
-              </Link>
-            )}
-          </div>
+          {session?.user?.id ? (
+            <Link
+              href="/home"
+              className="rounded-full border border-[#302C28] px-4 py-2 text-sm font-medium text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
+            >
+              Back to app
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-full bg-[#C84B18] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
+            >
+              Sign in
+            </Link>
+          )}
         </div>
       </header>
 
@@ -200,8 +192,9 @@ export default async function PublicProfilePage({
             </p>
 
             <p className="mt-1 text-sm leading-6 text-[#A7A19A]">
-              Only you can open this profile right now. This page shows
-              how your public profile will look.
+              Only you can open this profile right now. Make your
+              profile public from Account Settings so other people
+              can view it.
             </p>
           </div>
         ) : null}
@@ -259,25 +252,41 @@ export default async function PublicProfilePage({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <ProfileStat
-              label="Diary"
-              value={publicEntryCount.toString()}
-            />
+          <div>
+            <div className="flex flex-wrap justify-start gap-3 lg:justify-end">
+              {isOwner ? (
+                <Link
+                  href="/settings"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#C84B18] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
+                >
+                  <EditIcon className="h-4 w-4" />
+                  Edit profile
+                </Link>
+              ) : null}
 
-            <ProfileStat
-              label="Reviews"
-              value={publicReviewCount.toString()}
-            />
+              <ShareProfileButton username={user.username} />
+            </div>
 
-            <ProfileStat
-              label="Avg. rating"
-              value={
-                ratingStats._avg.rating !== null
-                  ? ratingStats._avg.rating.toFixed(1)
-                  : "—"
-              }
-            />
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              <ProfileStat
+                label="Diary"
+                value={publicEntryCount.toString()}
+              />
+
+              <ProfileStat
+                label="Reviews"
+                value={publicReviewCount.toString()}
+              />
+
+              <ProfileStat
+                label="Avg. rating"
+                value={
+                  ratingStats._avg.rating !== null
+                    ? ratingStats._avg.rating.toFixed(1)
+                    : "—"
+                }
+              />
+            </div>
           </div>
         </section>
 
@@ -293,16 +302,13 @@ export default async function PublicProfilePage({
               </h2>
             </div>
 
-            {publicEntryCount > entries.length ? (
-              <p className="text-xs text-[#625D58]">
-                Showing the latest {entries.length} entries
-              </p>
-            ) : (
-              <p className="text-xs text-[#625D58]">
-                {publicEntryCount}{" "}
-                {publicEntryCount === 1 ? "entry" : "entries"}
-              </p>
-            )}
+            <p className="text-xs text-[#625D58]">
+              {publicEntryCount > entries.length
+                ? `Showing the latest ${entries.length} entries`
+                : `${publicEntryCount} ${
+                    publicEntryCount === 1 ? "entry" : "entries"
+                  }`}
+            </p>
           </div>
 
           {entries.length === 0 ? (
@@ -335,15 +341,7 @@ export default async function PublicProfilePage({
                               }
                             : undefined
                         }
-                      >
-                        {!posterUrl ? (
-                          <div className="flex h-full items-center justify-center p-2 text-center">
-                            <span className="text-xs font-medium text-[#8A8580]">
-                              {entry.title}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
+                      />
 
                       <div className="min-w-0">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -384,8 +382,7 @@ export default async function PublicProfilePage({
                           </div>
                         </div>
 
-                        {entry.review &&
-                        entry.reviewIsPublic ? (
+                        {entry.review && entry.reviewIsPublic ? (
                           <div className="mt-5 border-t border-[#302C28] pt-5">
                             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                               <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#625D58]">
@@ -442,6 +439,29 @@ function ProfileStat({
         {label}
       </p>
     </div>
+  );
+}
+
+function EditIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="m14.5 5.5 4 4M4 20l4.5-1 10-10a2.83 2.83 0 0 0-4-4l-10 10L4 20Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
