@@ -1,5 +1,10 @@
 import Link from "next/link";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 
+import { WatchlistButton } from "@/components/watchlist/WatchlistButton";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import {
   getTmdbPosterUrl,
   searchTmdb,
@@ -31,13 +36,28 @@ function getPageNumber(value: string | string[] | undefined) {
   return page;
 }
 
+function getMediaKey(
+  mediaType: "movie" | "tv",
+  tmdbId: number,
+) {
+  return `${mediaType}:${tmdbId}`;
+}
+
 export default async function SearchPage({
   searchParams,
 }: SearchPageProps) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
   const query = getParam(searchParams?.q).trim();
   const currentPage = getPageNumber(searchParams?.page);
 
-  let result = null;
+  let result: Awaited<ReturnType<typeof searchTmdb>> | null =
+    null;
+
   let errorMessage = "";
 
   if (query) {
@@ -48,6 +68,31 @@ export default async function SearchPage({
 
       errorMessage =
         "Search results could not be loaded. Check the TMDB token and try again.";
+    }
+  }
+
+  const savedKeys = new Set<string>();
+
+  if (result && result.results.length > 0) {
+    const savedItems = await prisma.watchlistItem.findMany({
+      where: {
+        userId: session.user.id,
+        deletedAt: null,
+        OR: result.results.map((item) => ({
+          tmdbId: item.id,
+          mediaType: item.mediaType,
+        })),
+      },
+      select: {
+        tmdbId: true,
+        mediaType: true,
+      },
+    });
+
+    for (const item of savedItems) {
+      savedKeys.add(
+        getMediaKey(item.mediaType, item.tmdbId),
+      );
     }
   }
 
@@ -101,7 +146,7 @@ export default async function SearchPage({
             </div>
 
             <p className="text-xs text-[#625D58]">
-              {result.totalResults.toLocaleString("en-US")} results
+              {result.results.length} titles on this page
             </p>
           </div>
 
@@ -121,6 +166,9 @@ export default async function SearchPage({
                 <SearchResultCard
                   key={`${item.mediaType}-${item.id}`}
                   item={item}
+                  isSaved={savedKeys.has(
+                    getMediaKey(item.mediaType, item.id),
+                  )}
                 />
               ))}
             </div>
@@ -146,8 +194,10 @@ export default async function SearchPage({
 
 function SearchResultCard({
   item,
+  isSaved,
 }: {
   item: TmdbSearchResult;
+  isSaved: boolean;
 }) {
   const posterUrl = getTmdbPosterUrl(item.posterPath);
 
@@ -209,12 +259,22 @@ function SearchResultCard({
         </span>
       </div>
 
+      <div className="mt-3 space-y-2">
         <Link
-        href={`/log/${item.mediaType}/${item.id}`}
-        className="mt-3 block w-full rounded-full border border-[#C84B18]/50 px-3 py-2 text-center text-xs font-medium text-[#C84B18] transition hover:bg-[#C84B18] hover:text-white"
+          href={`/log/${item.mediaType}/${item.id}`}
+          className="block w-full rounded-full border border-[#C84B18]/50 px-3 py-2 text-center text-xs font-medium text-[#C84B18] transition hover:bg-[#C84B18] hover:text-white"
         >
-        Log this title
+          Log this title
         </Link>
+
+        <WatchlistButton
+          tmdbId={item.id}
+          mediaType={item.mediaType}
+          title={item.title}
+          initialSaved={isSaved}
+          fullWidth
+        />
+      </div>
     </article>
   );
 }
