@@ -16,6 +16,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTmdbPosterUrl } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 type PublicProfilePageProps = {
   params: {
     username: string;
@@ -588,67 +590,102 @@ function DiarySection({
                 key={entry.id}
                 className="rounded-xl border border-[#27231F] bg-[#1A1714] p-5"
               >
-                <div className="grid gap-5 sm:grid-cols-[88px_1fr]">
-                  <div
-                    className="aspect-[2/3] w-[88px] rounded-lg bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20"
-                    style={
-                      posterUrl
-                        ? {
-                            backgroundImage: `url("${posterUrl}")`,
-                          }
-                        : undefined
-                    }
-                  >
-                    {!posterUrl ? (
-                      <div className="flex h-full items-center justify-center p-2 text-center">
-                        <span className="text-xs font-medium text-[#8A8580]">
-                          {entry.title}
-                        </span>
-                      </div>
-                    ) : null}
+                <div className="flex gap-4 sm:hidden">
+                  <DiaryPoster
+                    posterUrl={posterUrl}
+                    title={entry.title}
+                    className="h-[96px] w-[64px] shrink-0"
+                  />
+
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-base font-semibold text-[#F4F1EB]">
+                      {entry.title}
+                    </h3>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[8px] uppercase tracking-wide text-[#8A8580]">
+                        {entry.mediaType === "movie"
+                          ? "Film"
+                          : "Series"}
+                      </span>
+
+                      <RatingBadge
+                        rating={entry.rating}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-[11px] text-[#8A8580]">
+                      Watched{" "}
+                      {new Intl.DateTimeFormat(
+                        "en",
+                        {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "UTC",
+                        },
+                      ).format(entry.watchedAt)}
+                    </p>
                   </div>
+                </div>
+
+                {entry.review && entry.reviewIsPublic ? (
+                  <div className="mt-4 border-t border-[#302C28] pt-4 sm:hidden">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#625D58]">
+                        Review
+                      </p>
+
+                      {entry.spoiler ? (
+                        <span className="rounded-full bg-[#C84B18]/10 px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#E45A1C]">
+                          Contains spoilers
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <FormattedReview
+                      text={entry.review}
+                      hideWholeReview={entry.spoiler}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="hidden gap-5 sm:grid sm:grid-cols-[120px_1fr]">
+                  <DiaryPoster
+                    posterUrl={posterUrl}
+                    title={entry.title}
+                    className="aspect-[2/3] w-[120px]"
+                  />
 
                   <div className="min-w-0">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h3 className="text-xl font-semibold text-[#F4F1EB]">
-                            {entry.title}
-                          </h3>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="text-xl font-semibold text-[#F4F1EB]">
+                        {entry.title}
+                      </h3>
 
-                          <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#8A8580]">
-                            {entry.mediaType === "movie"
-                              ? "Film"
-                              : "Series"}
-                          </span>
-                        </div>
+                      <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#8A8580]">
+                        {entry.mediaType === "movie"
+                          ? "Film"
+                          : "Series"}
+                      </span>
 
-                        <p className="mt-3 text-xs text-[#8A8580]">
-                          Watched{" "}
-                          {new Intl.DateTimeFormat(
-                            "en",
-                            {
-                              day: "2-digit",
-                              month: "long",
-                              year: "numeric",
-                              timeZone: "UTC",
-                            },
-                          ).format(entry.watchedAt)}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 sm:text-right">
-                        <p className="text-[10px] uppercase tracking-[0.12em] text-[#625D58]">
-                          Rating
-                        </p>
-
-                        <p className="mt-1 text-lg font-semibold text-[#E45A1C]">
-                          {entry.rating !== null
-                            ? `${entry.rating.toFixed(1)} / 5`
-                            : "Not rated"}
-                        </p>
-                      </div>
+                      <RatingBadge
+                        rating={entry.rating}
+                      />
                     </div>
+
+                    <p className="mt-3 text-xs text-[#8A8580]">
+                      Watched{" "}
+                      {new Intl.DateTimeFormat(
+                        "en",
+                        {
+                          day: "2-digit",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "UTC",
+                        },
+                      ).format(entry.watchedAt)}
+                    </p>
 
                     {entry.review &&
                     entry.reviewIsPublic ? (
@@ -680,6 +717,78 @@ function DiarySection({
         </div>
       )}
     </section>
+  );
+}
+
+function DiaryPoster({
+  posterUrl,
+  title,
+  className = "",
+}: {
+  posterUrl: string | null;
+  title: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-lg bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20",
+        className,
+      ].join(" ")}
+      style={
+        posterUrl
+          ? {
+              backgroundImage: `url("${posterUrl}")`,
+            }
+          : undefined
+      }
+    >
+      {!posterUrl ? (
+        <div className="flex h-full items-center justify-center p-2 text-center">
+          <span className="text-xs font-medium text-[#8A8580]">
+            {title}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RatingBadge({
+  rating,
+}: {
+  rating: number | null;
+}) {
+  if (rating === null) {
+    return (
+      <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#625D58]">
+        Not rated
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#251712] px-2.5 py-1 text-xs font-semibold text-[#E45A1C]">
+      <StarIcon className="h-3 w-3" />
+      {rating.toFixed(1)}
+    </span>
+  );
+}
+
+function StarIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="m12 2.8 2.75 5.57 6.15.9-4.45 4.33 1.05 6.13L12 16.84l-5.5 2.89 1.05-6.13L3.1 9.27l6.15-.9L12 2.8Z" />
+    </svg>
   );
 }
 

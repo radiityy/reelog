@@ -78,6 +78,9 @@ export function DiaryEntryForm({
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const hasReview = Boolean(review.trim());
+  const canPublishReview = isPublic && hasReview;
+
   function applyReviewFormat(
     prefix: string,
     suffix: string,
@@ -375,35 +378,46 @@ export function DiaryEntryForm({
             <ToggleOption
               checked={spoiler}
               onChange={setSpoiler}
-              disabled={isSubmitting || !review.trim()}
+              disabled={isSubmitting || !hasReview}
               title="The whole review contains spoilers"
               description="Hide the complete review behind a spoiler warning. Use ||spoiler|| when only part of the review needs to be hidden."
             />
           </div>
 
           <div className="mt-6">
-            <VisibilitySelector
-              label="Review visibility"
-              value={reviewIsPublic}
+            <p className="mb-3 text-sm font-medium text-[#C9C4BC]">
+              Review privacy
+            </p>
+
+            <ToggleOption
+              checked={reviewIsPublic}
               onChange={setReviewIsPublic}
-              disabled={isSubmitting}
-              publicDisabled={!isPublic || !review.trim()}
-              privateTitle="Private review"
-              publicTitle="Public review"
-              privateDescription="Only you can read this review."
-              publicDescription="Other people may read this review on your public profile."
+              disabled={isSubmitting || !canPublishReview}
+              title="Show this review on my public profile"
+              description={
+                !isPublic
+                  ? "Make the diary entry public first. Your review stays private until then."
+                  : !hasReview
+                    ? "Write a review first. Empty reviews cannot be published."
+                    : reviewIsPublic
+                      ? "People who can view your profile may read this review."
+                      : "This review is saved privately and only visible to you."
+              }
             />
 
-            {!isPublic ? (
-              <p className="mt-2 text-xs text-[#8A8580]">
-                Make the diary entry public before publishing its
-                review.
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-[#302C28] bg-[#171411] px-4 py-3">
+              {reviewIsPublic ? (
+                <GlobeIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#E45A1C]" />
+              ) : (
+                <LockIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#8A8580]" />
+              )}
+
+              <p className="text-xs leading-5 text-[#8A8580]">
+                {reviewIsPublic
+                  ? "Only the review is shared. Your private notes are never published."
+                  : "Private is the default. Reelog will not publish this review unless you turn this on."}
               </p>
-            ) : !review.trim() ? (
-              <p className="mt-2 text-xs text-[#8A8580]">
-                Write a review before making it public.
-              </p>
-            ) : null}
+            </div>
           </div>
         </div>
 
@@ -650,6 +664,36 @@ function VisibilitySelector({
         </p>
       </div>
     </div>
+  );
+}
+
+function GlobeIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+
+      <path
+        d="M3.5 12h17M12 3c2.2 2.5 3.4 5.5 3.4 9S14.2 18.5 12 21M12 3C9.8 5.5 8.6 8.5 8.6 12S9.8 18.5 12 21"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

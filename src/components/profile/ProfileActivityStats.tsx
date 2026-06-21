@@ -13,38 +13,32 @@ export function ProfileActivityStats({
 }: ProfileActivityStatsProps) {
   return (
     <section className="mt-6 w-full lg:w-[560px]">
-      <div className="relative overflow-hidden rounded-2xl border-y border-[#2A2521] bg-[#14110F]/70">
-        <span
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#6A5145]/35 to-transparent"
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-6">
+        <MetricItem
+          label="Diary entries"
+          value={diaryCount.toString()}
+          icon={<DiaryIcon className="h-4 w-4" />}
+          perforated
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-3">
-          <MetricItem
-            label="Diary entries"
-            value={diaryCount.toString()}
-            icon={<DiaryIcon className="h-4 w-4" />}
-          />
+        <MetricItem
+          label="Reviews"
+          value={reviewCount.toString()}
+          icon={<ReviewIcon className="h-4 w-4" />}
+          dashedEmpty={reviewCount === 0}
+        />
 
-          <MetricItem
-            label="Reviews"
-            value={reviewCount.toString()}
-            icon={<ReviewIcon className="h-4 w-4" />}
-            divider
-          />
-
-          <MetricItem
-            label="Average rating"
-            value={
-              averageRating !== null
-                ? averageRating.toFixed(1)
-                : "—"
-            }
-            icon={<StarIcon className="h-4 w-4" />}
-            divider
-            accent
-          />
-        </div>
+        <MetricItem
+          label="Average rating"
+          value={
+            averageRating !== null
+              ? averageRating.toFixed(1)
+              : "—"
+          }
+          icon={<StarIcon className="h-4 w-4" />}
+          accent
+          watermark
+        />
       </div>
     </section>
   );
@@ -54,34 +48,66 @@ function MetricItem({
   label,
   value,
   icon,
-  divider = false,
   accent = false,
+  perforated = false,
+  dashedEmpty = false,
+  watermark = false,
 }: {
   label: string;
   value: string;
   icon: ReactNode;
-  divider?: boolean;
   accent?: boolean;
+  perforated?: boolean;
+  dashedEmpty?: boolean;
+  watermark?: boolean;
 }) {
   return (
     <div
       className={[
-        "group relative flex min-h-[104px] items-center gap-4 px-5 py-5 transition duration-200",
+        "group relative flex min-h-[104px] items-center gap-4 rounded-2xl bg-[#171411]/60 px-4 py-5 transition duration-200",
         "hover:bg-[#1B1714]",
-        divider
-          ? "border-t border-[#2A2521] sm:border-l sm:border-t-0"
-          : "",
       ].join(" ")}
     >
       <span
         className={[
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition duration-200",
+          "relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden border transition duration-200",
           accent
-            ? "border-[#5B3223] bg-[#251712] text-[#E06532] group-hover:border-[#7A3E27] group-hover:bg-[#2D1A13]"
-            : "border-[#312B26] bg-[#1C1815] text-[#8C837C] group-hover:border-[#423933] group-hover:text-[#D0C8C0]",
+            ? "rounded-tl-xl rounded-tr-xl rounded-br-[18px] rounded-bl-xl border-[#5B3223] bg-[#251712] text-[#E06532] group-hover:border-[#7A3E27] group-hover:bg-[#2D1A13]"
+            : dashedEmpty
+              ? "rounded-xl border-dashed border-[#3A332D] bg-[#1C1815] text-[#6F675F] group-hover:border-[#4A4039]"
+              : "rounded-xl border-[#312B26] bg-[#1C1815] text-[#8C837C] group-hover:border-[#423933] group-hover:text-[#D0C8C0]",
         ].join(" ")}
       >
-        {icon}
+        {perforated ? (
+          <>
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 flex w-[5px] flex-col items-center justify-evenly"
+            >
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+            </span>
+
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 right-0 flex w-[5px] flex-col items-center justify-evenly"
+            >
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+              <span className="h-[3px] w-[3px] rounded-full bg-[#14110F]" />
+            </span>
+          </>
+        ) : null}
+
+        {watermark ? (
+          <StarIcon
+            aria-hidden="true"
+            className="absolute -bottom-1 -right-1 h-6 w-6 text-[#E06532] opacity-20"
+          />
+        ) : null}
+
+        <span className="relative">{icon}</span>
       </span>
 
       <div className="min-w-0">
@@ -104,7 +130,7 @@ function MetricItem({
       <span
         aria-hidden="true"
         className={[
-          "absolute bottom-0 left-5 right-5 h-px scale-x-0 transition-transform duration-200 group-hover:scale-x-100",
+          "absolute bottom-1 left-4 right-4 h-px scale-x-0 transition-transform duration-200 group-hover:scale-x-100",
           accent
             ? "bg-[#D95D2B]/70"
             : "bg-[#4A4039]/60",
@@ -177,15 +203,17 @@ function ReviewIcon({
 
 function StarIcon({
   className = "",
+  ...rest
 }: {
   className?: string;
-}) {
+} & React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="currentColor"
       aria-hidden="true"
       className={className}
+      {...rest}
     >
       <path d="m12 2.8 2.75 5.57 6.15.9-4.45 4.33 1.05 6.13L12 16.84l-5.5 2.89 1.05-6.13L3.1 9.27l6.15-.9L12 2.8Z" />
     </svg>
