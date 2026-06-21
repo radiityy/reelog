@@ -23,6 +23,12 @@ enum DiaryVisibility {
   PRIVATE
 }
 
+enum FollowStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model User {
   id    String  @id @default(cuid())
   name  String?
@@ -53,9 +59,33 @@ model User {
   watchlistItems WatchlistItem[]
   featuredFilms  FeaturedFilm[]
 
+  followers Follow[] @relation("UserFollowers")
+  following Follow[] @relation("UserFollowing")
+
   @@index([role])
   @@index([deletedAt])
   @@index([suspendedAt])
+}
+
+model Follow {
+  id String @id @default(cuid())
+
+  followerId  String
+  followingId String
+
+  status FollowStatus @default(PENDING)
+
+  requestedAt DateTime  @default(now())
+  respondedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId, status])
+  @@index([followingId, status])
+  @@index([followingId, requestedAt])
 }
 
 model DiaryEntry {

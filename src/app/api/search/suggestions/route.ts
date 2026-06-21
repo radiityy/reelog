@@ -10,6 +10,7 @@ import {
 } from "@/lib/tmdb";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions);
@@ -38,12 +39,17 @@ export async function GET(request: Request) {
   try {
     const [tmdbResult, users] = await Promise.all([
       searchTmdb(query, 1),
+
       prisma.user.findMany({
         where: {
           onboardingCompleted: true,
-          isPublic: true,
           deletedAt: null,
           suspendedAt: null,
+
+          username: {
+            not: null,
+          },
+
           OR: [
             {
               username: {
@@ -59,37 +65,46 @@ export async function GET(request: Request) {
             },
           ],
         },
-        orderBy: [
-          {
-            username: "asc",
-          },
-        ],
-        take: 4,
+
+        orderBy: {
+          username: "asc",
+        },
+
+        take: 5,
+
         select: {
           id: true,
           username: true,
           name: true,
           image: true,
           avatarPath: true,
+          isPublic: true,
         },
       }),
     ]);
 
-    const titles = tmdbResult.results.slice(0, 6).map((item) => ({
-      id: item.id,
-      title: item.title,
-      mediaType: item.mediaType,
-      posterUrl: getTmdbPosterUrl(item.posterPath),
-      releaseYear: item.releaseDate
-        ? item.releaseDate.slice(0, 4)
-        : null,
-      rating: item.rating,
-    }));
+    const titles = tmdbResult.results
+      .slice(0, 6)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        mediaType: item.mediaType,
+        posterUrl: getTmdbPosterUrl(
+          item.posterPath,
+        ),
+        releaseYear: item.releaseDate
+          ? item.releaseDate.slice(0, 4)
+          : null,
+        rating: item.rating,
+      }));
 
     const people = users
       .filter(
-        (user): user is typeof user & { username: string } =>
-          Boolean(user.username),
+        (
+          user,
+        ): user is typeof user & {
+          username: string;
+        } => Boolean(user.username),
       )
       .map((user) => ({
         id: user.id,
@@ -99,6 +114,7 @@ export async function GET(request: Request) {
           user.avatarPath,
           user.image,
         ),
+        isPrivate: !user.isPublic,
       }));
 
     return NextResponse.json({
@@ -106,11 +122,15 @@ export async function GET(request: Request) {
       people,
     });
   } catch (error) {
-    console.error("Global search suggestion error:", error);
+    console.error(
+      "Global search suggestion error:",
+      error,
+    );
 
     return NextResponse.json(
       {
-        message: "Unable to load search suggestions.",
+        message:
+          "Unable to load search suggestions.",
       },
       {
         status: 500,

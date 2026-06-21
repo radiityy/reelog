@@ -1,3 +1,7 @@
+import {
+  FollowStatus,
+  type MediaType,
+} from "@prisma/client";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -5,7 +9,8 @@ import { notFound } from "next/navigation";
 
 import { FormattedReview } from "@/components/diary/FormattedReview";
 import { ProfileAvatarEditor } from "@/components/profile/ProfileAvatarEditor";
-import { ShareProfileButton } from "@/components/profile/ShareProfileButton";
+import { ProfileFollowSection } from "@/components/profile/ProfileFollowSection";
+import { ProfileActivityStats } from "@/components/profile/ProfileActivityStats";
 import { getUserAvatarUrl } from "@/lib/avatar";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -16,6 +21,13 @@ type PublicProfilePageProps = {
     username: string;
   };
 };
+
+type FollowRelationship =
+  | "SELF"
+  | "NONE"
+  | "PENDING"
+  | "ACCEPTED"
+  | "REJECTED";
 
 type ConnectionPlatform =
   | "github"
@@ -31,12 +43,29 @@ type SocialConnection = {
   platform: ConnectionPlatform;
 };
 
+type ProfileDiaryEntry = {
+  id: string;
+  title: string;
+  posterPath: string | null;
+  mediaType: MediaType;
+  rating: number | null;
+  review: string | null;
+  spoiler: boolean;
+  reviewIsPublic: boolean;
+  watchedAt: Date;
+};
+
+type MutualFollower = {
+  id: string;
+  username: string;
+  name: string | null;
+  avatarUrl: string | null;
+};
+
 export async function generateMetadata({
   params,
 }: PublicProfilePageProps): Promise<Metadata> {
-  const username = params.username
-    .trim()
-    .toLowerCase();
+  const username = normalizeUsername(params.username);
 
   const user = await prisma.user.findFirst({
     where: {
@@ -52,15 +81,17 @@ export async function generateMetadata({
     },
   });
 
-  if (!user || !user.isPublic) {
+  if (!user?.username) {
     return {
       title: "Profile not found | Reelog",
     };
   }
 
   return {
-    title: `${user.name ?? `@${user.username}`} | Reelog`,
-    description: `View @${user.username}'s public film and series diary on Reelog.`,
+    title: `${user.name?.trim() || `@${user.username}`} | Reelog`,
+    description: user.isPublic
+      ? `View @${user.username}'s public film and series diary on Reelog.`
+      : `View @${user.username}'s profile on Reelog.`,
   };
 }
 
@@ -68,10 +99,8 @@ export default async function PublicProfilePage({
   params,
 }: PublicProfilePageProps) {
   const session = await getServerSession(authOptions);
-
-  const username = params.username
-    .trim()
-    .toLowerCase();
+  const viewerId = session?.user?.id ?? null;
+  const username = normalizeUsername(params.username);
 
   const user = await prisma.user.findFirst({
     where: {
@@ -97,12 +126,269 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const isOwner = session?.user?.id === user.id;
+  const isOwner = viewerId === user.id;
 
-  if (!user.isPublic && !isOwner) {
-    notFound();
-  }
+  const [
+    relationship,
+    reverseRelationship,
+    followersCount,
+    followingCount,
+  ] = await Promise.all([
+    viewerId && !isOwner
+      ? prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: viewerId,
+              followingId: user.id,
+            },
+          },
+          select: {
+            status: true,
+          },
+        })
+      : Promise.resolve(null),
 
+    viewerId && !isOwner
+      ? prisma.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: user.id,
+              followingId: viewerId,
+            },
+          },
+          select: {
+            status: true,
+          },
+        })
+      : Promise.resolve(null),
+
+    prisma.follow.count({
+      where: {
+        followingId: user.id,
+        status: FollowStatus.ACCEPTED,
+      },
+    }),
+
+    prisma.follow.count({
+      where: {
+        followerId: user.id,
+        status: FollowStatus.ACCEPTED,
+      },
+    }),
+  ]);
+
+  const initialRelationship = resolveRelationship(
+    relationship?.status,
+    isOwner,
+  );
+
+  const followsYou =
+    reverseRelationship?.status === FollowStatus.ACCEPTED;
+
+  const canViewActivity =
+    isOwner ||
+    user.isPublic ||
+    relationship?.status === FollowStatus.ACCEPTED;
+
+  const [
+    entries,
+    publicEntryCount,
+    publicReviewCount,
+    averageRating,
+  ] = canViewActivity
+    ? await loadPublicActivity(user.id)
+    : [[], 0, 0, null];
+
+  const {
+    users: mutualFollowers,
+    total: mutualFollowersCount,
+  } =
+    viewerId && !isOwner
+      ? await loadMutualFollowers(viewerId, user.id)
+      : {
+          users: [],
+          total: 0,
+        };
+
+  const homeHref = viewerId ? "/home" : "/";
+  const displayName =
+    user.name?.trim() || `@${user.username}`;
+
+  const avatarUrl = getUserAvatarUrl(
+    user.avatarPath,
+    user.image,
+  );
+
+  const socialConnection = getSocialConnection(
+    user.socialLink,
+  );
+
+  const joinedDate = new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(user.createdAt);
+
+  return (
+    <main className="min-h-screen bg-[#100E0C] text-[#F4F1EB]">
+      <header className="border-b border-[#27231F]">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 md:px-8">
+          <Link
+            href={homeHref}
+            className="text-xl font-bold tracking-tight text-[#F4F1EB]"
+          >
+            Reelog
+          </Link>
+
+          {viewerId ? (
+            <Link
+              href="/home"
+              className="rounded-full border border-[#302C28] px-4 py-2 text-sm font-medium text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
+            >
+              Back to app
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-full bg-[#C84B18] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
+            >
+              Sign in
+            </Link>
+          )}
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-5 py-10 md:px-8 md:py-14">
+        <section className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-start">
+            <ProfileAvatarEditor
+              username={user.username}
+              name={user.name}
+              initialAvatarUrl={avatarUrl}
+            />
+
+            <div className="min-w-0 pt-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-xs uppercase tracking-[0.16em] text-[#625D58]">
+                  Profile
+                </p>
+
+                {!user.isPublic ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#302C28] bg-[#171411] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.1em] text-[#8A8580]">
+                    <LockIcon className="h-3 w-3" />
+                    Private
+                  </span>
+                ) : null}
+              </div>
+
+              <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#F4F1EB] md:text-5xl">
+                {displayName}
+              </h1>
+
+              <p className="mt-2 text-sm font-medium text-[#E45A1C]">
+                @{user.username}
+              </p>
+
+              {user.bio ? (
+                <p className="mt-5 max-w-2xl text-sm leading-7 text-[#A7A19A]">
+                  {user.bio}
+                </p>
+              ) : null}
+
+              {mutualFollowersCount > 0 ? (
+                <MutualFollowersLine
+                  users={mutualFollowers}
+                  total={mutualFollowersCount}
+                />
+              ) : null}
+
+              {socialConnection ? (
+                <div className="mt-7">
+                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#625D58]">
+                    Connections
+                  </p>
+
+                  <a
+                    href={socialConnection.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-3 rounded-xl border border-[#27231F] bg-[#171411] px-4 py-3 transition hover:border-[#3A3530] hover:bg-[#211E1B]"
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F4F1EB] text-[#171411]">
+                      <ConnectionIcon
+                        platform={socialConnection.platform}
+                        className="h-5 w-5"
+                      />
+                    </span>
+
+                    <span className="max-w-48 truncate text-sm font-semibold text-[#F4F1EB]">
+                      {socialConnection.label}
+                    </span>
+
+                    <ExternalLinkIcon className="h-4 w-4 shrink-0 text-[#716B65]" />
+                  </a>
+                </div>
+              ) : null}
+
+              <p className="mt-6 text-xs text-[#625D58]">
+                Joined {joinedDate}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <ProfileFollowSection
+              username={user.username}
+              isOwner={isOwner}
+              isAuthenticated={Boolean(viewerId)}
+              initialRelationship={initialRelationship}
+              initialFollowsYou={followsYou}
+              initialFollowersCount={followersCount}
+              initialFollowingCount={followingCount}
+            />
+
+              {canViewActivity ? (
+                <ProfileActivityStats
+                  diaryCount={publicEntryCount}
+                  reviewCount={publicReviewCount}
+                  averageRating={averageRating}
+                />
+              ) : null}
+          </div>
+        </section>
+
+        {canViewActivity ? (
+          <DiarySection
+            entries={entries}
+            publicEntryCount={publicEntryCount}
+          />
+        ) : (
+          <PrivateProfileLock
+            relationship={initialRelationship}
+            username={user.username}
+            isAuthenticated={Boolean(viewerId)}
+          />
+        )}
+
+        <footer className="mt-16 border-t border-[#27231F] pt-6 text-center">
+          <p className="text-xs text-[#625D58]">
+            Film and series data provided by TMDB.
+          </p>
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+async function loadPublicActivity(userId: string): Promise<
+  [
+    ProfileDiaryEntry[],
+    number,
+    number,
+    number | null,
+  ]
+> {
   const [
     entries,
     publicEntryCount,
@@ -111,7 +397,7 @@ export default async function PublicProfilePage({
   ] = await Promise.all([
     prisma.diaryEntry.findMany({
       where: {
-        userId: user.id,
+        userId,
         isPublic: true,
         deletedAt: null,
       },
@@ -139,7 +425,7 @@ export default async function PublicProfilePage({
 
     prisma.diaryEntry.count({
       where: {
-        userId: user.id,
+        userId,
         isPublic: true,
         deletedAt: null,
       },
@@ -147,7 +433,7 @@ export default async function PublicProfilePage({
 
     prisma.diaryEntry.count({
       where: {
-        userId: user.id,
+        userId,
         isPublic: true,
         reviewIsPublic: true,
         review: {
@@ -159,7 +445,7 @@ export default async function PublicProfilePage({
 
     prisma.diaryEntry.aggregate({
       where: {
-        userId: user.id,
+        userId,
         isPublic: true,
         rating: {
           not: null,
@@ -172,337 +458,361 @@ export default async function PublicProfilePage({
     }),
   ]);
 
-  const homeHref = session?.user?.id
-    ? "/home"
-    : "/";
+  return [
+    entries,
+    publicEntryCount,
+    publicReviewCount,
+    ratingStats._avg.rating,
+  ];
+}
 
-  const displayName =
-    user.name?.trim() || `@${user.username}`;
-
-  const avatarUrl = getUserAvatarUrl(
-    user.avatarPath,
-    user.image,
-  );
-
-  const socialConnection = getSocialConnection(
-    user.socialLink,
-  );
-
-  const joinedDate = new Intl.DateTimeFormat(
-    "en",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
+async function loadMutualFollowers(
+  viewerId: string,
+  profileUserId: string,
+): Promise<{
+  users: MutualFollower[];
+  total: number;
+}> {
+  const mutualWhere = {
+    followingId: profileUserId,
+    status: FollowStatus.ACCEPTED,
+    followerId: {
+      not: viewerId,
     },
-  ).format(user.createdAt);
+    follower: {
+      onboardingCompleted: true,
+      deletedAt: null,
+      suspendedAt: null,
+      followers: {
+        some: {
+          followerId: viewerId,
+          status: FollowStatus.ACCEPTED,
+        },
+      },
+    },
+  } as const;
 
+  const [rows, total] = await Promise.all([
+    prisma.follow.findMany({
+      where: mutualWhere,
+      orderBy: {
+        requestedAt: "desc",
+      },
+      take: 3,
+      select: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            image: true,
+            avatarPath: true,
+          },
+        },
+      },
+    }),
+
+    prisma.follow.count({
+      where: mutualWhere,
+    }),
+  ]);
+
+  const users = rows
+    .filter((row) => Boolean(row.follower.username))
+    .map((row) => ({
+      id: row.follower.id,
+      username: row.follower.username as string,
+      name: row.follower.name,
+      avatarUrl: getUserAvatarUrl(
+        row.follower.avatarPath,
+        row.follower.image,
+      ),
+    }));
+
+  return {
+    users,
+    total,
+  };
+}
+
+function DiarySection({
+  entries,
+  publicEntryCount,
+}: {
+  entries: ProfileDiaryEntry[];
+  publicEntryCount: number;
+}) {
   return (
-    <main className="min-h-screen bg-[#100E0C] text-[#F4F1EB]">
-      <header className="border-b border-[#27231F]">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 md:px-8">
-          <Link
-            href={homeHref}
-            className="text-xl font-bold tracking-tight text-[#F4F1EB]"
-          >
-            Reelog
-          </Link>
+    <section className="mt-16">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.16em] text-[#625D58]">
+            Public activity
+          </p>
 
-          {session?.user?.id ? (
-            <Link
-              href="/home"
-              className="rounded-full border border-[#302C28] px-4 py-2 text-sm font-medium text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
-            >
-              Back to app
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-full bg-[#C84B18] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
-            >
-              Sign in
-            </Link>
-          )}
+          <h2 className="mt-2 text-2xl font-bold text-[#F4F1EB]">
+            Diary
+          </h2>
         </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-5 py-10 md:px-8 md:py-14">
-        <section className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-start">
-          <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-start">
-            <ProfileAvatarEditor
-              username={user.username}
-              initialAvatarUrl={avatarUrl}
-              initialHasCustomAvatar={Boolean(
-                user.avatarPath,
-              )}
-              editable={isOwner}
-            />
+        <p className="text-xs text-[#625D58]">
+          {publicEntryCount > entries.length
+            ? `Showing the latest ${entries.length} entries`
+            : `${publicEntryCount} ${
+                publicEntryCount === 1
+                  ? "entry"
+                  : "entries"
+              }`}
+        </p>
+      </div>
 
-            <div className="min-w-0 pt-1">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#625D58]">
-                Profile
-              </p>
+      {entries.length === 0 ? (
+        <div className="mt-7 rounded-xl border border-dashed border-[#302C28] bg-[#171411] px-6 py-16 text-center">
+          <h3 className="text-lg font-semibold text-[#F4F1EB]">
+            No public diary entries yet
+          </h3>
 
-              <h1 className="mt-2 text-4xl font-bold tracking-tight text-[#F4F1EB] md:text-5xl">
-                {displayName}
-              </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#8A8580]">
+            Public diary entries will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-7 space-y-5">
+          {entries.map((entry) => {
+            const posterUrl = getTmdbPosterUrl(
+              entry.posterPath,
+            );
 
-              <p className="mt-2 text-sm font-medium text-[#E45A1C]">
-                @{user.username}
-              </p>
-
-              {user.bio ? (
-                <p className="mt-5 max-w-2xl text-sm leading-7 text-[#A7A19A]">
-                  {user.bio}
-                </p>
-              ) : null}
-
-              {socialConnection ? (
-                <div className="mt-7">
-                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#625D58]">
-                    Connections
-                  </p>
-
-                  <a
-                    href={socialConnection.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-flex items-center gap-3 rounded-xl border border-[#27231F] bg-[#171411] px-4 py-3 transition hover:border-[#3A3530] hover:bg-[#211E1B]"
+            return (
+              <article
+                key={entry.id}
+                className="rounded-xl border border-[#27231F] bg-[#1A1714] p-5"
+              >
+                <div className="grid gap-5 sm:grid-cols-[88px_1fr]">
+                  <div
+                    className="aspect-[2/3] w-[88px] rounded-lg bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20"
+                    style={
+                      posterUrl
+                        ? {
+                            backgroundImage: `url("${posterUrl}")`,
+                          }
+                        : undefined
+                    }
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F4F1EB] text-[#171411]">
-                      <ConnectionIcon
-                        platform={
-                          socialConnection.platform
-                        }
-                        className="h-5 w-5"
-                      />
-                    </span>
-
-                    <span className="max-w-48 truncate text-sm font-semibold text-[#F4F1EB]">
-                      {socialConnection.label}
-                    </span>
-
-                    <ExternalLinkIcon className="h-4 w-4 shrink-0 text-[#716B65]" />
-                  </a>
-                </div>
-              ) : null}
-
-              <p className="mt-6 text-xs text-[#625D58]">
-                Joined {joinedDate}
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex flex-wrap justify-start gap-3 lg:justify-end">
-              {isOwner ? (
-                <Link
-                  href="/settings"
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#C84B18] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
-                >
-                  <EditIcon className="h-4 w-4" />
-                  Edit profile
-                </Link>
-              ) : null}
-
-              <ShareProfileButton
-                username={user.username}
-              />
-            </div>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <ProfileStat
-                label="Diary"
-                value={publicEntryCount.toString()}
-              />
-
-              <ProfileStat
-                label="Reviews"
-                value={publicReviewCount.toString()}
-              />
-
-              <ProfileStat
-                label="Avg. rating"
-                value={
-                  ratingStats._avg.rating !== null
-                    ? ratingStats._avg.rating.toFixed(1)
-                    : "—"
-                }
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-16">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.16em] text-[#625D58]">
-                Public activity
-              </p>
-
-              <h2 className="mt-2 text-2xl font-bold text-[#F4F1EB]">
-                Diary
-              </h2>
-            </div>
-
-            <p className="text-xs text-[#625D58]">
-              {publicEntryCount > entries.length
-                ? `Showing the latest ${entries.length} entries`
-                : `${publicEntryCount} ${
-                    publicEntryCount === 1
-                      ? "entry"
-                      : "entries"
-                  }`}
-            </p>
-          </div>
-
-          {entries.length === 0 ? (
-            <div className="mt-7 rounded-xl border border-dashed border-[#302C28] bg-[#171411] px-6 py-16 text-center">
-              <h3 className="text-lg font-semibold text-[#F4F1EB]">
-                No public diary entries yet
-              </h3>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#8A8580]">
-                Public diary entries will appear here.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-7 space-y-5">
-              {entries.map((entry) => {
-                const posterUrl = getTmdbPosterUrl(
-                  entry.posterPath,
-                );
-
-                return (
-                  <article
-                    key={entry.id}
-                    className="rounded-xl border border-[#27231F] bg-[#1A1714] p-5"
-                  >
-                    <div className="grid gap-5 sm:grid-cols-[88px_1fr]">
-                      <div
-                        className="aspect-[2/3] w-[88px] rounded-lg bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20"
-                        style={
-                          posterUrl
-                            ? {
-                                backgroundImage: `url("${posterUrl}")`,
-                              }
-                            : undefined
-                        }
-                      >
-                        {!posterUrl ? (
-                          <div className="flex h-full items-center justify-center p-2 text-center">
-                            <span className="text-xs font-medium text-[#8A8580]">
-                              {entry.title}
-                            </span>
-                          </div>
-                        ) : null}
+                    {!posterUrl ? (
+                      <div className="flex h-full items-center justify-center p-2 text-center">
+                        <span className="text-xs font-medium text-[#8A8580]">
+                          {entry.title}
+                        </span>
                       </div>
+                    ) : null}
+                  </div>
 
+                  <div className="min-w-0">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <h3 className="text-xl font-semibold text-[#F4F1EB]">
-                                {entry.title}
-                              </h3>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-semibold text-[#F4F1EB]">
+                            {entry.title}
+                          </h3>
 
-                              <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#8A8580]">
-                                {entry.mediaType ===
-                                "movie"
-                                  ? "Film"
-                                  : "Series"}
-                              </span>
-                            </div>
-
-                            <p className="mt-3 text-xs text-[#8A8580]">
-                              Watched{" "}
-                              {new Intl.DateTimeFormat(
-                                "en",
-                                {
-                                  day: "2-digit",
-                                  month: "long",
-                                  year: "numeric",
-                                  timeZone: "UTC",
-                                },
-                              ).format(entry.watchedAt)}
-                            </p>
-                          </div>
-
-                          <div className="shrink-0 sm:text-right">
-                            <p className="text-[10px] uppercase tracking-[0.12em] text-[#625D58]">
-                              Rating
-                            </p>
-
-                            <p className="mt-1 text-lg font-semibold text-[#E45A1C]">
-                              {entry.rating
-                                ? `${entry.rating.toFixed(1)} / 5`
-                                : "Not rated"}
-                            </p>
-                          </div>
+                          <span className="rounded-full bg-[#211E1B] px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#8A8580]">
+                            {entry.mediaType === "movie"
+                              ? "Film"
+                              : "Series"}
+                          </span>
                         </div>
 
-                        {entry.review &&
-                        entry.reviewIsPublic ? (
-                          <div className="mt-5 border-t border-[#302C28] pt-5">
-                            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#625D58]">
-                                Review
-                              </p>
+                        <p className="mt-3 text-xs text-[#8A8580]">
+                          Watched{" "}
+                          {new Intl.DateTimeFormat(
+                            "en",
+                            {
+                              day: "2-digit",
+                              month: "long",
+                              year: "numeric",
+                              timeZone: "UTC",
+                            },
+                          ).format(entry.watchedAt)}
+                        </p>
+                      </div>
 
-                              {entry.spoiler ? (
-                                <span className="rounded-full bg-[#C84B18]/10 px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#E45A1C]">
-                                  Contains spoilers
-                                </span>
-                              ) : null}
-                            </div>
+                      <div className="shrink-0 sm:text-right">
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-[#625D58]">
+                          Rating
+                        </p>
 
-                            <FormattedReview
-                              text={entry.review}
-                              hideWholeReview={
-                                entry.spoiler
-                              }
-                              className="max-w-3xl"
-                            />
-                          </div>
-                        ) : null}
+                        <p className="mt-1 text-lg font-semibold text-[#E45A1C]">
+                          {entry.rating !== null
+                            ? `${entry.rating.toFixed(1)} / 5`
+                            : "Not rated"}
+                        </p>
                       </div>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </section>
 
-        <footer className="mt-16 border-t border-[#27231F] pt-6 text-center">
-          <p className="text-xs text-[#625D58]">
-            Film and series data provided by TMDB.
-          </p>
-        </footer>
-      </div>
-    </main>
+                    {entry.review &&
+                    entry.reviewIsPublic ? (
+                      <div className="mt-5 border-t border-[#302C28] pt-5">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-[#625D58]">
+                            Review
+                          </p>
+
+                          {entry.spoiler ? (
+                            <span className="rounded-full bg-[#C84B18]/10 px-2.5 py-1 text-[9px] uppercase tracking-wide text-[#E45A1C]">
+                              Contains spoilers
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <FormattedReview
+                          text={entry.review}
+                          hideWholeReview={entry.spoiler}
+                          className="max-w-3xl"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
-function ProfileStat({
-  label,
-  value,
+function PrivateProfileLock({
+  relationship,
+  username,
+  isAuthenticated,
 }: {
-  label: string;
-  value: string;
+  relationship: FollowRelationship;
+  username: string;
+  isAuthenticated: boolean;
 }) {
-  return (
-    <div className="min-w-[96px] rounded-xl border border-[#27231F] bg-[#171411] px-4 py-4 text-center">
-      <p className="text-xl font-bold text-[#F4F1EB]">
-        {value}
-      </p>
+  let description =
+    "Follow this account to see their public diary, reviews, and film activity.";
 
-      <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#625D58]">
-        {label}
+  if (!isAuthenticated) {
+    description = `Sign in and follow @${username} to see their public activity.`;
+  }
+
+  if (relationship === "PENDING") {
+    description =
+      "Your follow request is waiting for approval.";
+  }
+
+  if (relationship === "REJECTED") {
+    description =
+      "Your previous request was not accepted. You can send another request.";
+  }
+
+  return (
+    <section className="mt-16">
+      <div className="rounded-2xl border border-[#27231F] bg-[#171411] px-6 py-16 text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[#302C28] bg-[#211E1B] text-[#A7A19A]">
+          <LockIcon className="h-6 w-6" />
+        </span>
+
+        <h2 className="mt-5 text-xl font-semibold text-[#F4F1EB]">
+          This account is private
+        </h2>
+
+        <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-[#8A8580]">
+          {description}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function MutualFollowersLine({
+  users,
+  total,
+}: {
+  users: MutualFollower[];
+  total: number;
+}) {
+  const firstUser = users[0];
+
+  if (!firstUser) {
+    return null;
+  }
+
+  const remainingCount = Math.max(total - 1, 0);
+
+  return (
+    <div className="mt-5 flex items-center gap-3">
+      <div className="flex shrink-0 -space-x-2">
+        {users.map((user) => (
+          <span
+            key={user.id}
+            className="relative flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-[#100E0C] bg-[#9B7567] bg-cover bg-center text-[9px] font-bold text-white"
+            style={
+              user.avatarUrl
+                ? {
+                    backgroundImage: `url("${user.avatarUrl}")`,
+                  }
+                : undefined
+            }
+          >
+            {!user.avatarUrl
+              ? (user.name ?? user.username)
+                  .charAt(0)
+                  .toUpperCase()
+              : null}
+          </span>
+        ))}
+      </div>
+
+      <p className="min-w-0 text-xs text-[#8A8580]">
+        Followed by{" "}
+        <Link
+          href={`/u/${firstUser.username}`}
+          className="font-semibold text-[#C9C4BC] transition hover:text-[#E45A1C]"
+        >
+          {firstUser.name?.trim() ||
+            `@${firstUser.username}`}
+        </Link>
+
+        {remainingCount > 0
+          ? ` and ${remainingCount} ${
+              remainingCount === 1
+                ? "other"
+                : "others"
+            }`
+          : ""}
       </p>
     </div>
   );
+}
+
+function resolveRelationship(
+  status: FollowStatus | undefined,
+  isOwner: boolean,
+): FollowRelationship {
+  if (isOwner) {
+    return "SELF";
+  }
+
+  switch (status) {
+    case FollowStatus.PENDING:
+      return "PENDING";
+    case FollowStatus.ACCEPTED:
+      return "ACCEPTED";
+    case FollowStatus.REJECTED:
+      return "REJECTED";
+    default:
+      return "NONE";
+  }
+}
+
+function normalizeUsername(value: string) {
+  return decodeURIComponent(value)
+    .trim()
+    .toLowerCase();
 }
 
 function getSocialConnection(
@@ -734,7 +1044,7 @@ function ExternalLinkIcon({
   );
 }
 
-function EditIcon({
+function LockIcon({
   className = "",
 }: {
   className?: string;
@@ -746,12 +1056,28 @@ function EditIcon({
       aria-hidden="true"
       className={className}
     >
+      <rect
+        x="5"
+        y="10"
+        width="14"
+        height="10"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+
       <path
-        d="m14.5 5.5 4 4M4 20l4.5-1 10-10a2.83 2.83 0 0 0-4-4l-10 10L4 20Z"
+        d="M8 10V7.5a4 4 0 0 1 8 0V10"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
-        strokeLinejoin="round"
+      />
+
+      <circle
+        cx="12"
+        cy="15"
+        r="1"
+        fill="currentColor"
       />
     </svg>
   );

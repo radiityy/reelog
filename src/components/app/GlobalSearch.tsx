@@ -598,6 +598,8 @@ export function GlobalSearch() {
           <input
             ref={inputRef}
             type="search"
+            role="combobox"
+            aria-autocomplete="list"
             value={query}
             onFocus={() => setIsOpen(true)}
             onChange={(event) => {

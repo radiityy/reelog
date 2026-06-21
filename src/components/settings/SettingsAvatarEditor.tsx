@@ -2,6 +2,7 @@
 
 import {
   type ChangeEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -36,41 +37,91 @@ export function SettingsAvatarEditor({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
-  const [hasCustomAvatar, setHasCustomAvatar] = useState(
-    initialHasCustomAvatar,
+  const [avatarUrl, setAvatarUrl] = useState(
+    initialAvatarUrl,
   );
-  const [selectedFile, setSelectedFile] = useState<File | null>(
-    null,
-  );
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    null,
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showRemoveConfirmation, setShowRemoveConfirmation] =
-    useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  const displayedAvatarUrl = previewUrl ?? avatarUrl;
-  const avatarInitial = username.charAt(0).toUpperCase();
+  const [hasCustomAvatar, setHasCustomAvatar] =
+    useState(initialHasCustomAvatar);
+
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
+
+  const [previewUrl, setPreviewUrl] = useState<
+    string | null
+  >(null);
+
+  const [isModalOpen, setIsModalOpen] =
+    useState(false);
+
+  const [
+    showRemoveConfirmation,
+    setShowRemoveConfirmation,
+  ] = useState(false);
+
+  const [isUploading, setIsUploading] =
+    useState(false);
+
+  const [isRemoving, setIsRemoving] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const displayedAvatarUrl =
+    previewUrl ?? avatarUrl;
+
+  const avatarInitial = username
+    .charAt(0)
+    .toUpperCase();
+
   const isBusy = isUploading || isRemoving;
+
+  const clearSelectedFile = useCallback(() => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    setSelectedFile(null);
+    setPreviewUrl(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [previewUrl]);
+
+  const closeModal = useCallback(() => {
+    if (isBusy) {
+      return;
+    }
+
+    clearSelectedFile();
+    setErrorMessage("");
+    setShowRemoveConfirmation(false);
+    setIsModalOpen(false);
+  }, [clearSelectedFile, isBusy]);
 
   useEffect(() => {
     setAvatarUrl(initialAvatarUrl);
     setHasCustomAvatar(initialHasCustomAvatar);
-  }, [initialAvatarUrl, initialHasCustomAvatar]);
+  }, [
+    initialAvatarUrl,
+    initialHasCustomAvatar,
+  ]);
 
   useEffect(() => {
     if (!isModalOpen) {
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
+    const previousOverflow =
+      document.body.style.overflow;
+
     document.body.style.overflow = "hidden";
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
       if (event.key !== "Escape" || isBusy) {
         return;
       }
@@ -83,13 +134,26 @@ export function SettingsAvatarEditor({
       closeModal();
     }
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
     };
-  }, [isModalOpen, isBusy, showRemoveConfirmation]);
+  }, [
+    closeModal,
+    isBusy,
+    isModalOpen,
+    showRemoveConfirmation,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -109,21 +173,12 @@ export function SettingsAvatarEditor({
     setIsModalOpen(true);
   }
 
-  function closeModal() {
+  function openFilePicker() {
     if (isBusy) {
       return;
     }
 
-    clearSelectedFile();
-    setErrorMessage("");
-    setShowRemoveConfirmation(false);
-    setIsModalOpen(false);
-  }
-
-  function openFilePicker() {
-    if (!isBusy) {
-      fileInputRef.current?.click();
-    }
+    fileInputRef.current?.click();
   }
 
   function handleFileChange(
@@ -142,12 +197,16 @@ export function SettingsAvatarEditor({
       setErrorMessage(
         "Only JPG, PNG, and WebP images are allowed.",
       );
+
       event.target.value = "";
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      setErrorMessage("Profile photo cannot exceed 2 MB.");
+      setErrorMessage(
+        "Profile photo cannot exceed 2 MB.",
+      );
+
       event.target.value = "";
       return;
     }
@@ -158,19 +217,6 @@ export function SettingsAvatarEditor({
 
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
-  }
-
-  function clearSelectedFile() {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-
-    setSelectedFile(null);
-    setPreviewUrl(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   }
 
   async function handleUpload() {
@@ -185,29 +231,41 @@ export function SettingsAvatarEditor({
     formData.append("avatar", selectedFile);
 
     try {
-      const response = await fetch("/api/settings/avatar", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "/api/settings/avatar",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
-      const payload = (await response.json()) as AvatarResponse;
+      const payload =
+        (await response.json()) as AvatarResponse;
 
       if (!response.ok) {
         setErrorMessage(
           payload.message ??
             "Unable to upload the profile photo.",
         );
+
         return;
       }
 
       setAvatarUrl(payload.avatarUrl ?? null);
-      setHasCustomAvatar(true);
+
+      setHasCustomAvatar(
+        payload.hasCustomAvatar ?? true,
+      );
+
       clearSelectedFile();
       setShowRemoveConfirmation(false);
       setIsModalOpen(false);
+
       router.refresh();
     } catch {
-      setErrorMessage("Unable to connect to the server.");
+      setErrorMessage(
+        "Unable to connect to the server.",
+      );
     } finally {
       setIsUploading(false);
     }
@@ -218,29 +276,42 @@ export function SettingsAvatarEditor({
     setIsRemoving(true);
 
     try {
-      const response = await fetch("/api/settings/avatar", {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        "/api/settings/avatar",
+        {
+          method: "DELETE",
+        },
+      );
 
-      const payload = (await response.json()) as AvatarResponse;
+      const payload =
+        (await response.json()) as AvatarResponse;
 
       if (!response.ok) {
         setErrorMessage(
           payload.message ??
             "Unable to remove the profile photo.",
         );
+
         setShowRemoveConfirmation(false);
         return;
       }
 
       setAvatarUrl(payload.avatarUrl ?? null);
-      setHasCustomAvatar(false);
+
+      setHasCustomAvatar(
+        payload.hasCustomAvatar ?? false,
+      );
+
       clearSelectedFile();
       setShowRemoveConfirmation(false);
       setIsModalOpen(false);
+
       router.refresh();
     } catch {
-      setErrorMessage("Unable to connect to the server.");
+      setErrorMessage(
+        "Unable to connect to the server.",
+      );
+
       setShowRemoveConfirmation(false);
     } finally {
       setIsRemoving(false);
@@ -273,6 +344,7 @@ export function SettingsAvatarEditor({
 
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
             <CameraIcon className="h-5 w-5" />
+
             <span className="text-[9px] font-semibold leading-tight">
               Change photo
             </span>
@@ -315,8 +387,9 @@ export function SettingsAvatarEditor({
                 </h2>
 
                 <p className="mt-2 text-sm leading-6 text-[#8A8580]">
-                  Your custom profile photo will be deleted, your
-                  Google account photo will be used again.
+                  Your custom profile photo will be
+                  deleted, and your Google account
+                  photo will be used again.
                 </p>
 
                 {errorMessage ? (
@@ -329,7 +402,9 @@ export function SettingsAvatarEditor({
                   <button
                     type="button"
                     onClick={() =>
-                      setShowRemoveConfirmation(false)
+                      setShowRemoveConfirmation(
+                        false,
+                      )
                     }
                     disabled={isRemoving}
                     className="rounded-full border border-[#3A3530] px-5 py-2.5 text-sm font-medium text-[#C9C4BC] transition hover:text-[#F4F1EB] disabled:opacity-50"
@@ -343,7 +418,9 @@ export function SettingsAvatarEditor({
                     disabled={isRemoving}
                     className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isRemoving ? "Removing..." : "Remove photo"}
+                    {isRemoving
+                      ? "Removing..."
+                      : "Remove photo"}
                   </button>
                 </div>
               </div>
@@ -359,7 +436,8 @@ export function SettingsAvatarEditor({
                     </h2>
 
                     <p className="mt-1 text-sm leading-6 text-[#8A8580]">
-                      Choose a JPG, PNG, or WebP image up to 2 MB.
+                      Choose a JPG, PNG, or WebP image
+                      up to 2 MB.
                     </p>
                   </div>
 
@@ -389,6 +467,7 @@ export function SettingsAvatarEditor({
 
                   <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white">
                     <CameraIcon className="h-8 w-8" />
+
                     <span className="text-sm font-semibold">
                       Choose photo
                     </span>
@@ -402,7 +481,9 @@ export function SettingsAvatarEditor({
                     </p>
 
                     <p className="mt-1 text-xs text-[#716B65]">
-                      {formatFileSize(selectedFile.size)}
+                      {formatFileSize(
+                        selectedFile.size,
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -426,9 +507,10 @@ export function SettingsAvatarEditor({
                   <InfoIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#A7A19A]" />
 
                   <p className="text-xs leading-5 text-[#C9C4BC]">
-                    By uploading a photo, you confirm that you have
-                    the right to use it. Inappropriate or harmful
-                    profile images are not allowed on Reelog.
+                    By uploading a photo, you confirm
+                    that you have the right to use it.
+                    Inappropriate or harmful profile
+                    images are not allowed on Reelog.
                   </p>
                 </div>
 
@@ -439,7 +521,10 @@ export function SettingsAvatarEditor({
                         type="button"
                         onClick={() => {
                           setErrorMessage("");
-                          setShowRemoveConfirmation(true);
+
+                          setShowRemoveConfirmation(
+                            true,
+                          );
                         }}
                         disabled={isBusy}
                         className="rounded-full border border-red-900/60 px-4 py-2.5 text-sm font-medium text-red-300 transition hover:bg-red-950/30 disabled:cursor-not-allowed disabled:opacity-50"
@@ -462,10 +547,14 @@ export function SettingsAvatarEditor({
                     <button
                       type="button"
                       onClick={handleUpload}
-                      disabled={!selectedFile || isBusy}
+                      disabled={
+                        !selectedFile || isBusy
+                      }
                       className="rounded-full bg-[#C84B18] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#DC5520] disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      {isUploading ? "Uploading..." : "Save photo"}
+                      {isUploading
+                        ? "Uploading..."
+                        : "Save photo"}
                     </button>
                   </div>
                 </div>
@@ -621,5 +710,8 @@ function formatFileSize(size: number) {
     return `${(size / 1024).toFixed(1)} KB`;
   }
 
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(
+    size /
+    (1024 * 1024)
+  ).toFixed(1)} MB`;
 }
