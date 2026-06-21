@@ -13,12 +13,14 @@ type UserMenuProps = {
   username: string;
   name?: string | null;
   image?: string | null;
+  followRequestCount?: number;
 };
 
 export function UserMenu({
   username,
   name,
   image,
+  followRequestCount = 0,
 }: UserMenuProps) {
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -27,11 +29,17 @@ export function UserMenu({
   const [isSigningOut, setIsSigningOut] =
     useState(false);
 
+  const requestCount = Math.max(
+    followRequestCount,
+    0,
+  );
+
   const avatarInitial = username
     .charAt(0)
     .toUpperCase();
 
-  const displayName = name?.trim() || `@${username}`;
+  const displayName =
+    name?.trim() || `@${username}`;
 
   useEffect(() => {
     setIsOpen(false);
@@ -41,13 +49,17 @@ export function UserMenu({
     function handlePointerDown(event: MouseEvent) {
       if (
         menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
+        !menuRef.current.contains(
+          event.target as Node,
+        )
       ) {
         setIsOpen(false);
       }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
       if (event.key === "Escape") {
         setIsOpen(false);
       }
@@ -89,17 +101,26 @@ export function UserMenu({
       {isOpen ? (
         <div className="absolute bottom-[calc(100%+12px)] left-0 w-full min-w-[260px] overflow-hidden rounded-2xl border border-[#302C28] bg-[#1A1714] p-3 shadow-2xl shadow-black/60">
           <div className="flex items-center gap-3 border-b border-[#302C28] px-2 pb-4">
-            <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
-              style={
-                image
-                  ? {
-                      backgroundImage: `url("${image}")`,
-                    }
-                  : undefined
-              }
-            >
-              {!image ? avatarInitial : null}
+            <span className="relative shrink-0">
+              <span
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
+                style={
+                  image
+                    ? {
+                        backgroundImage: `url("${image}")`,
+                      }
+                    : undefined
+                }
+              >
+                {!image ? avatarInitial : null}
+              </span>
+
+              {requestCount > 0 ? (
+                <NotificationBadge
+                  count={requestCount}
+                  className="-right-1 -top-1"
+                />
+              ) : null}
             </span>
 
             <div className="min-w-0">
@@ -120,6 +141,22 @@ export function UserMenu({
             >
               <ProfileIcon className="h-4 w-4" />
               View profile
+            </Link>
+
+            <Link
+              href="/follow-requests"
+              className="mt-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-[#C9C4BC] transition hover:bg-[#292521] hover:text-[#F4F1EB]"
+            >
+              <span className="flex items-center gap-3">
+                <FollowRequestsIcon className="h-4 w-4" />
+                Follow requests
+              </span>
+
+              {requestCount > 0 ? (
+                <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
+                  {formatBadgeCount(requestCount)}
+                </span>
+              ) : null}
             </Link>
 
             <Link
@@ -157,17 +194,26 @@ export function UserMenu({
         aria-haspopup="menu"
         className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition hover:border-[#2B2723] hover:bg-[#171411]"
       >
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
-          style={
-            image
-              ? {
-                  backgroundImage: `url("${image}")`,
-                }
-              : undefined
-          }
-        >
-          {!image ? avatarInitial : null}
+        <span className="relative shrink-0">
+          <span
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
+            style={
+              image
+                ? {
+                    backgroundImage: `url("${image}")`,
+                  }
+                : undefined
+            }
+          >
+            {!image ? avatarInitial : null}
+          </span>
+
+          {requestCount > 0 ? (
+            <NotificationBadge
+              count={requestCount}
+              className="-right-1.5 -top-1.5"
+            />
+          ) : null}
         </span>
 
         <span className="min-w-0 flex-1">
@@ -188,6 +234,59 @@ export function UserMenu({
         />
       </button>
     </div>
+  );
+}
+
+function NotificationBadge({
+  count,
+  className = "",
+}: {
+  count: number;
+  className?: string;
+}) {
+  return (
+    <span
+      className={[
+        "absolute flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#080706] bg-[#C84B18] px-1 text-[9px] font-bold leading-none text-white",
+        className,
+      ].join(" ")}
+    >
+      {formatBadgeCount(count)}
+    </span>
+  );
+}
+
+function formatBadgeCount(count: number) {
+  return count > 99 ? "99+" : count.toString();
+}
+
+function FollowRequestsIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle
+        cx="8.5"
+        cy="8"
+        r="3.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+
+      <path
+        d="M3 20c.4-4 2.3-6 5.5-6 1.8 0 3.2.6 4.1 1.7M17 13v6M14 16h6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

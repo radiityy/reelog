@@ -1,3 +1,4 @@
+import { FollowStatus } from "@prisma/client";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -9,6 +10,8 @@ import { UserMenu } from "@/components/app/UserMenu";
 import { getUserAvatarUrl } from "@/lib/avatar";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 type ProtectedLayoutProps = {
   children: ReactNode;
@@ -30,6 +33,7 @@ export default async function ProtectedLayout({
       suspendedAt: null,
     },
     select: {
+      id: true,
       username: true,
       name: true,
       image: true,
@@ -42,7 +46,10 @@ export default async function ProtectedLayout({
     redirect("/login");
   }
 
-  if (!user.onboardingCompleted || !user.username) {
+  if (
+    !user.onboardingCompleted ||
+    !user.username
+  ) {
     redirect("/onboarding");
   }
 
@@ -50,6 +57,19 @@ export default async function ProtectedLayout({
     user.avatarPath,
     user.image,
   );
+
+  const followRequestCount =
+    await prisma.follow.count({
+      where: {
+        followingId: user.id,
+        status: FollowStatus.PENDING,
+        follower: {
+          onboardingCompleted: true,
+          deletedAt: null,
+          suspendedAt: null,
+        },
+      },
+    });
 
   return (
     <div className="min-h-screen bg-[#080706] text-[#EDE8DE]">
@@ -62,7 +82,7 @@ export default async function ProtectedLayout({
         </Link>
 
         <p className="mt-2 px-3 text-xs text-[#514C47]">
-          Your film & series diary
+          Your film &amp; series diary
         </p>
 
         <div className="mt-9 flex-1">
@@ -71,7 +91,11 @@ export default async function ProtectedLayout({
 
         <UserMenu
           username={user.username}
+          name={user.name}
           image={avatarUrl}
+          followRequestCount={
+            followRequestCount
+          }
         />
       </aside>
 
@@ -80,6 +104,9 @@ export default async function ProtectedLayout({
           username={user.username}
           name={user.name}
           image={avatarUrl}
+          followRequestCount={
+            followRequestCount
+          }
         />
 
         <main className="mx-auto min-h-[calc(100vh-72px)] w-full max-w-[1600px] px-5 pb-28 pt-8 sm:px-8 lg:px-10 lg:pb-12">

@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
@@ -35,13 +36,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = createDiaryEntrySchema.safeParse(requestBody);
+  const result =
+    createDiaryEntrySchema.safeParse(requestBody);
 
   if (!result.success) {
     return NextResponse.json(
       {
         message:
-          result.error.issues[0]?.message ?? "Invalid diary entry.",
+          result.error.issues[0]?.message ??
+          "Invalid diary entry.",
         errors: result.error.flatten().fieldErrors,
       },
       {
@@ -59,10 +62,11 @@ export async function POST(request: Request) {
     },
     select: {
       id: true,
+      username: true,
     },
   });
 
-  if (!user) {
+  if (!user?.username) {
     return NextResponse.json(
       {
         message: "User account was not found.",
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
     );
   }
 
-    const {
+  const {
     tmdbId,
     mediaType,
     watchedAt,
@@ -83,34 +87,46 @@ export async function POST(request: Request) {
     spoiler,
     isPublic,
     reviewIsPublic,
-    } = result.data;
+  } = result.data;
+
+  const hasReview = review.length > 0;
 
   try {
-    const media = await getTmdbTitleDetails(mediaType, tmdbId);
+    const media = await getTmdbTitleDetails(
+      mediaType,
+      tmdbId,
+    );
 
-    const diaryEntry = await prisma.diaryEntry.create({
-      data: {
-        userId: user.id,
-        tmdbId: media.id,
-        mediaType: media.mediaType,
-        title: media.title,
-        posterPath: media.posterPath,
-        watchedAt: new Date(`${watchedAt}T12:00:00.000Z`),
-        rating,
-        review: review || null,
-        privateNotes: privateNotes || null,
-        spoiler,
-        isPublic,
-        reviewIsPublic:
-        isPublic && review.length > 0
-            ? reviewIsPublic
-            : false,
-         },
-      select: {
-        id: true,
-        title: true,
-      },
-    });
+    const diaryEntry =
+      await prisma.diaryEntry.create({
+        data: {
+          userId: user.id,
+          tmdbId: media.id,
+          mediaType: media.mediaType,
+          title: media.title,
+          posterPath: media.posterPath,
+          watchedAt: new Date(
+            `${watchedAt}T12:00:00.000Z`,
+          ),
+          rating,
+          review: hasReview ? review : null,
+          privateNotes: privateNotes || null,
+          spoiler: hasReview ? spoiler : false,
+          isPublic,
+          reviewIsPublic:
+            hasReview && isPublic
+              ? reviewIsPublic
+              : false,
+        },
+        select: {
+          id: true,
+          title: true,
+        },
+      });
+
+    revalidatePath("/home");
+    revalidatePath("/diary");
+    revalidatePath(`/u/${user.username}`);
 
     return NextResponse.json(
       {
@@ -122,7 +138,10 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error("Failed to create diary entry:", error);
+    console.error(
+      "Failed to create diary entry:",
+      error,
+    );
 
     return NextResponse.json(
       {

@@ -21,6 +21,7 @@ type AppHeaderProps = {
   username?: string | null;
   name?: string | null;
   image?: string | null;
+  followRequestCount?: number;
 };
 
 export function AppHeader({
@@ -28,15 +29,29 @@ export function AppHeader({
   username,
   name,
   image,
+  followRequestCount = 0,
 }: AppHeaderProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] =
+    useState(false);
 
-  const resolvedUsername = user?.username ?? username ?? null;
-  const resolvedName = user?.name ?? name ?? null;
-  const resolvedImage = user?.image ?? image ?? null;
+  const [isSigningOut, setIsSigningOut] =
+    useState(false);
+
+  const requestCount = Math.max(
+    followRequestCount,
+    0,
+  );
+
+  const resolvedUsername =
+    user?.username ?? username ?? null;
+
+  const resolvedName =
+    user?.name ?? name ?? null;
+
+  const resolvedImage =
+    user?.image ?? image ?? null;
 
   const accountLabel = resolvedUsername
     ? `@${resolvedUsername}`
@@ -54,27 +69,42 @@ export function AppHeader({
     function handlePointerDown(event: MouseEvent) {
       if (
         menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
+        !menuRef.current.contains(
+          event.target as Node,
+        )
       ) {
         setIsMenuOpen(false);
       }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(
+      event: KeyboardEvent,
+    ) {
       if (event.key === "Escape") {
         setIsMenuOpen(false);
       }
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener(
+      "mousedown",
+      handlePointerDown,
+    );
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown,
+    );
 
     return () => {
       document.removeEventListener(
         "mousedown",
         handlePointerDown,
       );
-      window.removeEventListener("keydown", handleKeyDown);
+
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown,
+      );
     };
   }, []);
 
@@ -97,25 +127,44 @@ export function AppHeader({
           <GlobalSearch />
         </div>
 
-        <div ref={menuRef} className="relative shrink-0">
+        <div
+          ref={menuRef}
+          className="relative shrink-0"
+        >
           <button
             type="button"
-            onClick={() => setIsMenuOpen((current) => !current)}
+            onClick={() =>
+              setIsMenuOpen(
+                (current) => !current,
+              )
+            }
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
             className="flex h-12 items-center gap-3 rounded-full border border-transparent bg-[#211E1B] p-1.5 pr-3 transition hover:border-[#302C28] hover:bg-[#292521]"
           >
-            <span
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
-              style={
-                resolvedImage
-                  ? {
-                      backgroundImage: `url("${resolvedImage}")`,
-                    }
-                  : undefined
-              }
-            >
-              {!resolvedImage ? avatarInitial : null}
+            <span className="relative shrink-0">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#9B7567] bg-cover bg-center text-sm font-semibold text-white"
+                style={
+                  resolvedImage
+                    ? {
+                        backgroundImage: `url("${resolvedImage}")`,
+                      }
+                    : undefined
+                }
+              >
+                {!resolvedImage
+                  ? avatarInitial
+                  : null}
+              </span>
+
+              {requestCount > 0 ? (
+                <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#100E0C] bg-[#C84B18] px-1 text-[9px] font-bold leading-none text-white">
+                  {formatBadgeCount(
+                    requestCount,
+                  )}
+                </span>
+              ) : null}
             </span>
 
             <span className="hidden max-w-40 truncate text-sm font-semibold text-[#EDE8DE] sm:block">
@@ -125,7 +174,9 @@ export function AppHeader({
             <ChevronIcon
               className={[
                 "hidden h-3.5 w-3.5 text-[#8A8580] transition sm:block",
-                isMenuOpen ? "rotate-180" : "",
+                isMenuOpen
+                  ? "rotate-180"
+                  : "",
               ].join(" ")}
             />
           </button>
@@ -133,7 +184,7 @@ export function AppHeader({
           {isMenuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-[calc(100%+10px)] w-56 overflow-hidden rounded-xl border border-[#302C28] bg-[#1A1714] p-2 shadow-2xl shadow-black/50"
+              className="absolute right-0 top-[calc(100%+10px)] w-60 overflow-hidden rounded-xl border border-[#302C28] bg-[#1A1714] p-2 shadow-2xl shadow-black/50"
             >
               <div className="border-b border-[#302C28] px-3 py-3">
                 <p className="truncate text-sm font-semibold text-[#F4F1EB]">
@@ -141,7 +192,8 @@ export function AppHeader({
                 </p>
 
                 {resolvedName &&
-                resolvedName !== resolvedUsername ? (
+                resolvedName !==
+                  resolvedUsername ? (
                   <p className="mt-1 truncate text-xs text-[#716B65]">
                     {resolvedName}
                   </p>
@@ -159,6 +211,26 @@ export function AppHeader({
                   View profile
                 </Link>
               ) : null}
+
+              <Link
+                href="/follow-requests"
+                role="menuitem"
+                onClick={closeMenu}
+                className="mt-1 flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-[#C9C4BC] transition hover:bg-[#292521] hover:text-[#F4F1EB]"
+              >
+                <span className="flex items-center gap-3">
+                  <FollowRequestsIcon className="h-4 w-4" />
+                  Follow requests
+                </span>
+
+                {requestCount > 0 ? (
+                  <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
+                    {formatBadgeCount(
+                      requestCount,
+                    )}
+                  </span>
+                ) : null}
+              </Link>
 
               <Link
                 href="/settings"
@@ -181,13 +253,49 @@ export function AppHeader({
               >
                 <SignOutIcon className="h-4 w-4" />
 
-                {isSigningOut ? "Signing out..." : "Sign out"}
+                {isSigningOut
+                  ? "Signing out..."
+                  : "Sign out"}
               </button>
             </div>
           ) : null}
         </div>
       </div>
     </header>
+  );
+}
+
+function formatBadgeCount(count: number) {
+  return count > 99 ? "99+" : count.toString();
+}
+
+function FollowRequestsIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle
+        cx="8.5"
+        cy="8"
+        r="3.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+
+      <path
+        d="M3 20c.4-4 2.3-6 5.5-6 1.8 0 3.2.6 4.1 1.7M17 13v6M14 16h6"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

@@ -57,7 +57,9 @@ function DiaryIcon({ className }: IconProps) {
   );
 }
 
-function WatchlistIcon({ className }: IconProps) {
+function WatchlistIcon({
+  className,
+}: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -76,25 +78,21 @@ const navigationItems = [
   {
     label: "Home",
     href: "/home",
-    available: true,
     icon: HomeIcon,
   },
   {
     label: "Search",
     href: "/search",
-    available: true,
     icon: SearchIcon,
   },
   {
     label: "Diary",
     href: "/diary",
-    available: true,
     icon: DiaryIcon,
   },
   {
     label: "Watchlist",
     href: "/watchlist",
-    available: true,
     icon: WatchlistIcon,
   },
 ];
@@ -113,7 +111,10 @@ export function AppNavigation({
       return pathname === "/home";
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   }
 
   if (mobile) {
@@ -123,23 +124,13 @@ export function AppNavigation({
           const Icon = item.icon;
           const active = isActive(item.href);
 
-          if (!item.available) {
-            return (
-              <span
-                key={item.href}
-                className="flex cursor-not-allowed flex-col items-center justify-center gap-1.5 px-2 py-3 text-[#4A4642]"
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px]">{item.label}</span>
-              </span>
-            );
-          }
-
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
+              aria-current={
+                active ? "page" : undefined
+              }
               className={[
                 "flex flex-col items-center justify-center gap-1.5 px-2 py-3 transition",
                 active
@@ -148,7 +139,10 @@ export function AppNavigation({
               ].join(" ")}
             >
               <Icon className="h-5 w-5" />
-              <span className="text-[10px]">{item.label}</span>
+
+              <span className="text-[10px]">
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -163,86 +157,80 @@ export function AppNavigation({
       </p>
 
       <div className="space-y-1">
-        {navigationItems.slice(0, 2).map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
+        {navigationItems
+          .slice(0, 2)
+          .map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={[
-                "flex items-center gap-4 rounded-md px-3 py-3 text-sm font-medium transition",
-                active
-                  ? "bg-[#211E1B] text-[#EDE8DE]"
-                  : "text-[#8A8580] hover:bg-[#171411] hover:text-[#EDE8DE]",
-              ].join(" ")}
-            >
-              <Icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={
+                  active ? "page" : undefined
+                }
                 className={[
-                  "h-5 w-5",
-                  active ? "text-[#C84B18]" : "",
+                  "flex items-center gap-4 rounded-md px-3 py-3 text-sm font-medium transition",
+                  active
+                    ? "bg-[#211E1B] text-[#EDE8DE]"
+                    : "text-[#8A8580] hover:bg-[#171411] hover:text-[#EDE8DE]",
                 ].join(" ")}
-              />
+              >
+                <Icon
+                  className={[
+                    "h-5 w-5",
+                    active
+                      ? "text-[#C84B18]"
+                      : "",
+                  ].join(" ")}
+                />
 
-              {item.label}
-            </Link>
-          );
-        })}
+                {item.label}
+              </Link>
+            );
+          })}
       </div>
 
-            <p className="mb-3 mt-9 px-3 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4A4642]">
-            Your library
-            </p>
+      <p className="mb-3 mt-9 px-3 font-mono text-[9px] uppercase tracking-[0.14em] text-[#4A4642]">
+        Your library
+      </p>
 
-            <div className="space-y-1">
-            {navigationItems.slice(2).map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
+      <div className="space-y-1">
+        {navigationItems
+          .slice(2)
+          .map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
 
-                if (!item.available) {
-                return (
-                    <div
-                    key={item.href}
-                    className="flex cursor-not-allowed items-center justify-between rounded-md px-3 py-3 text-[#514C47]"
-                    >
-                    <div className="flex items-center gap-4">
-                        <Icon className="h-5 w-5" />
-                        <span className="text-sm">{item.label}</span>
-                    </div>
-
-                    <span className="font-mono text-[7px] uppercase tracking-[0.1em]">
-                        Soon
-                    </span>
-                    </div>
-                );
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={
+                  active ? "page" : undefined
                 }
-
-                return (
-                <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={[
-                    "flex items-center gap-4 rounded-md px-3 py-3 text-sm font-medium transition",
+                className={[
+                  "flex items-center gap-4 rounded-md px-3 py-3 text-sm font-medium transition",
+                  active
+                    ? "bg-[#211E1B] text-[#EDE8DE]"
+                    : "text-[#8A8580] hover:bg-[#171411] hover:text-[#EDE8DE]",
+                ].join(" ")}
+              >
+                <Icon
+                  className={[
+                    "h-5 w-5",
                     active
-                        ? "bg-[#211E1B] text-[#EDE8DE]"
-                        : "text-[#8A8580] hover:bg-[#171411] hover:text-[#EDE8DE]",
-                    ].join(" ")}
-                >
-                    <Icon
-                    className={[
-                        "h-5 w-5",
-                        active ? "text-[#C84B18]" : "",
-                    ].join(" ")}
-                    />
+                      ? "text-[#C84B18]"
+                      : "",
+                  ].join(" ")}
+                />
 
-                    {item.label}
-                </Link>
-                );
-            })}
-        </div>
+                {item.label}
+              </Link>
+            );
+          })}
+      </div>
     </nav>
   );
 }
