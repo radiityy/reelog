@@ -251,7 +251,7 @@ export default async function HomePage() {
           </div>
 
           <p className="max-w-xs text-left text-sm leading-7 text-[#6E6862] md:text-right">
-            Watch it. Keep it.
+            Watch it and Keep it.
             <br />
             Make it yours.
           </p>
