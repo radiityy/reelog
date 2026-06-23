@@ -16,6 +16,6 @@ Reelog is a personal film and series diary for tracking what you watch, writing 
 
 ## Status
 
-Currently under development.
+Currently under development by me.
 
-COMING SOON
+Stay Tuned
