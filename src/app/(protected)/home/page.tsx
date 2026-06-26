@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { SocialFeed } from "@/components/feed/SocialFeed";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -102,14 +103,17 @@ export default async function HomePage() {
     <div>
       <section className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm text-[#8A8580]">@{user.username}</p>
+          <p className="text-sm text-[#8A8580]">
+            @{user.username}
+          </p>
 
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#F4F1EB] md:text-4xl">
             Welcome back, {user.username}
           </h1>
 
           <p className="mt-3 max-w-xl text-sm leading-6 text-[#8A8580]">
-            Search for something you watched, save what comes next, or continue
+            Search for something you watched,
+            save what comes next, or continue
             building your diary.
           </p>
         </div>
@@ -152,7 +156,8 @@ export default async function HomePage() {
             </p>
 
             <p className="mt-2 text-xs leading-5 text-[#8A8580]">
-              Find films and series to add to Reelog.
+              Find films and series to add to
+              Reelog.
             </p>
           </div>
 
@@ -161,6 +166,8 @@ export default async function HomePage() {
           </span>
         </Link>
       </section>
+
+      <SocialFeed />
 
       <section className="mt-12">
         <SectionHeader
@@ -183,8 +190,16 @@ export default async function HomePage() {
                 title={entry.title}
                 posterPath={entry.posterPath}
                 mediaType={entry.mediaType}
-                footer={entry.rating ? `${entry.rating} / 5` : "Not rated"}
-                badge={entry.isPublic ? "Public" : "Private"}
+                footer={
+                  entry.rating !== null
+                    ? `${entry.rating} / 5`
+                    : "Not rated"
+                }
+                badge={
+                  entry.isPublic
+                    ? "Public"
+                    : "Private"
+                }
               />
             ))}
           </div>
@@ -236,12 +251,18 @@ function DashboardCard({
   return (
     <article className="flex min-h-32 flex-col justify-between rounded-lg bg-[#211E1B] p-5">
       <div>
-        <p className="text-sm font-semibold text-[#F4F1EB]">{label}</p>
+        <p className="text-sm font-semibold text-[#F4F1EB]">
+          {label}
+        </p>
 
-        <p className="mt-2 text-xs leading-5 text-[#8A8580]">{description}</p>
+        <p className="mt-2 text-xs leading-5 text-[#8A8580]">
+          {description}
+        </p>
       </div>
 
-      <p className="mt-4 text-3xl font-bold text-[#C84B18]">{value}</p>
+      <p className="mt-4 text-3xl font-bold text-[#C84B18]">
+        {value}
+      </p>
     </article>
   );
 }
@@ -251,7 +272,10 @@ type SectionHeaderProps = {
   subtitle: string;
 };
 
-function SectionHeader({ title, subtitle }: SectionHeaderProps) {
+function SectionHeader({
+  title,
+  subtitle,
+}: SectionHeaderProps) {
   return (
     <div className="flex items-end justify-between">
       <div>
@@ -259,7 +283,9 @@ function SectionHeader({ title, subtitle }: SectionHeaderProps) {
           {title}
         </h2>
 
-        <p className="mt-1 text-sm text-[#8A8580]">{subtitle}</p>
+        <p className="mt-1 text-sm text-[#8A8580]">
+          {subtitle}
+        </p>
       </div>
     </div>
   );
@@ -280,7 +306,9 @@ function EmptySection({
 }: EmptySectionProps) {
   return (
     <div className="mt-5 rounded-lg border border-dashed border-[#302C28] bg-[#171411] px-6 py-12 text-center">
-      <h3 className="text-lg font-semibold text-[#F4F1EB]">{title}</h3>
+      <h3 className="text-lg font-semibold text-[#F4F1EB]">
+        {title}
+      </h3>
 
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#8A8580]">
         {description}
@@ -345,10 +373,14 @@ function MediaCard({
       </h3>
 
       <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="truncate text-xs text-[#8A8580]">{footer}</span>
+        <span className="truncate text-xs text-[#8A8580]">
+          {footer}
+        </span>
 
         <span className="shrink-0 text-[10px] uppercase text-[#625D58]">
-          {mediaType === "movie" ? "Film" : "Series"}
+          {mediaType === "movie"
+            ? "Film"
+            : "Series"}
         </span>
       </div>
     </article>
