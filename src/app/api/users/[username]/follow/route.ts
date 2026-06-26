@@ -1,8 +1,16 @@
-import { FollowStatus } from "@prisma/client";
+import {
+  FollowStatus,
+  NotificationType,
+} from "@prisma/client";
+import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
+import {
+  createOrRefreshNotification,
+  deleteNotificationByEntity,
+} from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -44,21 +52,22 @@ async function findTargetUser(username: string) {
 }
 
 async function getFollowCounts(userId: string) {
-  const [followers, following] = await Promise.all([
-    prisma.follow.count({
-      where: {
-        followingId: userId,
-        status: FollowStatus.ACCEPTED,
-      },
-    }),
+  const [followers, following] =
+    await Promise.all([
+      prisma.follow.count({
+        where: {
+          followingId: userId,
+          status: FollowStatus.ACCEPTED,
+        },
+      }),
 
-    prisma.follow.count({
-      where: {
-        followerId: userId,
-        status: FollowStatus.ACCEPTED,
-      },
-    }),
-  ]);
+      prisma.follow.count({
+        where: {
+          followerId: userId,
+          status: FollowStatus.ACCEPTED,
+        },
+      }),
+    ]);
 
   return {
     followers,
@@ -66,12 +75,54 @@ async function getFollowCounts(userId: string) {
   };
 }
 
+async function getReverseRelationship(
+  viewerId: string,
+  targetUserId: string,
+) {
+  return prisma.follow.findUnique({
+    where: {
+      followerId_followingId: {
+        followerId: targetUserId,
+        followingId: viewerId,
+      },
+    },
+    select: {
+      status: true,
+    },
+  });
+}
+
+function revalidateFollowPages(
+  viewerUsername: string | null,
+  targetUsername: string,
+) {
+  revalidatePath(`/u/${targetUsername}`);
+  revalidatePath(
+    `/u/${targetUsername}/followers`,
+  );
+  revalidatePath(
+    `/u/${targetUsername}/following`,
+  );
+  revalidatePath("/follow-requests");
+
+  if (viewerUsername) {
+    revalidatePath(`/u/${viewerUsername}`);
+    revalidatePath(
+      `/u/${viewerUsername}/followers`,
+    );
+    revalidatePath(
+      `/u/${viewerUsername}/following`,
+    );
+  }
+}
+
 export async function GET(
   _request: Request,
   { params }: RouteContext,
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session =
+      await getServerSession(authOptions);
 
     const username = normalizeUsername(
       params.username,
@@ -91,8 +142,11 @@ export async function GET(
       );
     }
 
-    const viewerId = session?.user?.id ?? null;
-    const isOwner = viewerId === targetUser.id;
+    const viewerId =
+      session?.user?.id ?? null;
+
+    const isOwner =
+      viewerId === targetUser.id;
 
     const counts = await getFollowCounts(
       targetUser.id,
@@ -100,7 +154,8 @@ export async function GET(
 
     if (!viewerId) {
       return NextResponse.json({
-        relationship: "NONE" satisfies RelationshipStatus,
+        relationship:
+          "NONE" satisfies RelationshipStatus,
         followsYou: false,
         isOwner: false,
         isPrivate: !targetUser.isPublic,
@@ -110,7 +165,8 @@ export async function GET(
 
     if (isOwner) {
       return NextResponse.json({
-        relationship: "SELF" satisfies RelationshipStatus,
+        relationship:
+          "SELF" satisfies RelationshipStatus,
         followsYou: false,
         isOwner: true,
         isPrivate: !targetUser.isPublic,
@@ -118,32 +174,27 @@ export async function GET(
       });
     }
 
-    const [relationship, reverseRelationship] =
-      await Promise.all([
-        prisma.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: viewerId,
-              followingId: targetUser.id,
-            },
+    const [
+      relationship,
+      reverseRelationship,
+    ] = await Promise.all([
+      prisma.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: viewerId,
+            followingId: targetUser.id,
           },
-          select: {
-            status: true,
-          },
-        }),
+        },
+        select: {
+          status: true,
+        },
+      }),
 
-        prisma.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: targetUser.id,
-              followingId: viewerId,
-            },
-          },
-          select: {
-            status: true,
-          },
-        }),
-      ]);
+      getReverseRelationship(
+        viewerId,
+        targetUser.id,
+      ),
+    ]);
 
     return NextResponse.json({
       relationship:
@@ -181,7 +232,8 @@ export async function POST(
   { params }: RouteContext,
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session =
+      await getServerSession(authOptions);
 
     const viewerId = session?.user?.id;
 
@@ -201,8 +253,35 @@ export async function POST(
       params.username,
     );
 
-    const targetUser =
-      await findTargetUser(username);
+    const [targetUser, viewer] =
+      await Promise.all([
+        findTargetUser(username),
+
+        prisma.user.findFirst({
+          where: {
+            id: viewerId,
+            onboardingCompleted: true,
+            deletedAt: null,
+            suspendedAt: null,
+          },
+          select: {
+            id: true,
+            username: true,
+          },
+        }),
+      ]);
+
+    if (!viewer) {
+      return NextResponse.json(
+        {
+          message:
+            "Your account is unavailable.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
 
     if (!targetUser?.username) {
       return NextResponse.json(
@@ -227,9 +306,10 @@ export async function POST(
       );
     }
 
-    const desiredStatus = targetUser.isPublic
-      ? FollowStatus.ACCEPTED
-      : FollowStatus.PENDING;
+    const desiredStatus =
+      targetUser.isPublic
+        ? FollowStatus.ACCEPTED
+        : FollowStatus.PENDING;
 
     const existingFollow =
       await prisma.follow.findUnique({
@@ -249,15 +329,24 @@ export async function POST(
       existingFollow?.status ===
       FollowStatus.ACCEPTED
     ) {
-      const counts = await getFollowCounts(
-        targetUser.id,
-      );
+      const [counts, reverseRelationship] =
+        await Promise.all([
+          getFollowCounts(targetUser.id),
+
+          getReverseRelationship(
+            viewerId,
+            targetUser.id,
+          ),
+        ]);
 
       return NextResponse.json({
         message:
           "You are already following this user.",
-        relationship: FollowStatus.ACCEPTED,
-        followsYou: false,
+        relationship:
+          FollowStatus.ACCEPTED,
+        followsYou:
+          reverseRelationship?.status ===
+          FollowStatus.ACCEPTED,
         isPrivate: !targetUser.isPublic,
         counts,
       });
@@ -268,15 +357,24 @@ export async function POST(
         FollowStatus.PENDING &&
       desiredStatus === FollowStatus.PENDING
     ) {
-      const counts = await getFollowCounts(
-        targetUser.id,
-      );
+      const [counts, reverseRelationship] =
+        await Promise.all([
+          getFollowCounts(targetUser.id),
+
+          getReverseRelationship(
+            viewerId,
+            targetUser.id,
+          ),
+        ]);
 
       return NextResponse.json({
         message:
           "Your follow request is still pending.",
-        relationship: FollowStatus.PENDING,
-        followsYou: false,
+        relationship:
+          FollowStatus.PENDING,
+        followsYou:
+          reverseRelationship?.status ===
+          FollowStatus.ACCEPTED,
         isPrivate: true,
         counts,
       });
@@ -299,6 +397,7 @@ export async function POST(
                 : null,
           },
           select: {
+            id: true,
             status: true,
           },
         })
@@ -314,26 +413,47 @@ export async function POST(
                 : null,
           },
           select: {
+            id: true,
             status: true,
           },
         });
+
+    if (
+      follow.status === FollowStatus.PENDING
+    ) {
+      await createOrRefreshNotification({
+        recipientId: targetUser.id,
+        actorId: viewerId,
+        type: NotificationType.FOLLOW_REQUEST,
+        entityId: follow.id,
+      });
+    }
+
+    if (
+      follow.status === FollowStatus.ACCEPTED
+    ) {
+      await createOrRefreshNotification({
+        recipientId: targetUser.id,
+        actorId: viewerId,
+        type: NotificationType.NEW_FOLLOWER,
+        entityId: follow.id,
+      });
+    }
 
     const [counts, reverseRelationship] =
       await Promise.all([
         getFollowCounts(targetUser.id),
 
-        prisma.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: targetUser.id,
-              followingId: viewerId,
-            },
-          },
-          select: {
-            status: true,
-          },
-        }),
+        getReverseRelationship(
+          viewerId,
+          targetUser.id,
+        ),
       ]);
+
+    revalidateFollowPages(
+      viewer.username,
+      targetUser.username,
+    );
 
     return NextResponse.json(
       {
@@ -379,7 +499,8 @@ export async function DELETE(
   { params }: RouteContext,
 ) {
   try {
-    const session = await getServerSession(authOptions);
+    const session =
+      await getServerSession(authOptions);
 
     const viewerId = session?.user?.id;
 
@@ -399,8 +520,35 @@ export async function DELETE(
       params.username,
     );
 
-    const targetUser =
-      await findTargetUser(username);
+    const [targetUser, viewer] =
+      await Promise.all([
+        findTargetUser(username),
+
+        prisma.user.findFirst({
+          where: {
+            id: viewerId,
+            onboardingCompleted: true,
+            deletedAt: null,
+            suspendedAt: null,
+          },
+          select: {
+            id: true,
+            username: true,
+          },
+        }),
+      ]);
+
+    if (!viewer) {
+      return NextResponse.json(
+        {
+          message:
+            "Your account is unavailable.",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
 
     if (!targetUser?.username) {
       return NextResponse.json(
@@ -440,18 +588,38 @@ export async function DELETE(
       });
 
     if (!existingFollow) {
-      const counts = await getFollowCounts(
-        targetUser.id,
-      );
+      const [counts, reverseRelationship] =
+        await Promise.all([
+          getFollowCounts(targetUser.id),
+
+          getReverseRelationship(
+            viewerId,
+            targetUser.id,
+          ),
+        ]);
 
       return NextResponse.json({
         message:
           "You are not following this user.",
         relationship:
           "NONE" satisfies RelationshipStatus,
-        followsYou: false,
+        followsYou:
+          reverseRelationship?.status ===
+          FollowStatus.ACCEPTED,
         isPrivate: !targetUser.isPublic,
         counts,
+      });
+    }
+
+    if (
+      existingFollow.status ===
+      FollowStatus.PENDING
+    ) {
+      await deleteNotificationByEntity({
+        recipientId: targetUser.id,
+        actorId: viewerId,
+        type: NotificationType.FOLLOW_REQUEST,
+        entityId: existingFollow.id,
       });
     }
 
@@ -465,18 +633,16 @@ export async function DELETE(
       await Promise.all([
         getFollowCounts(targetUser.id),
 
-        prisma.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: targetUser.id,
-              followingId: viewerId,
-            },
-          },
-          select: {
-            status: true,
-          },
-        }),
+        getReverseRelationship(
+          viewerId,
+          targetUser.id,
+        ),
       ]);
+
+    revalidateFollowPages(
+      viewer.username,
+      targetUser.username,
+    );
 
     return NextResponse.json({
       message:

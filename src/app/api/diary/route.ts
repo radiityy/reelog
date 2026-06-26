@@ -3,12 +3,18 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
+import { notifyFollowersAboutDiary } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getTmdbTitleDetails } from "@/lib/tmdb";
 import { createDiaryEntrySchema } from "@/lib/validation/diary";
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(
+    authOptions,
+  );
 
   if (!session?.user?.id) {
     return NextResponse.json(
@@ -37,7 +43,9 @@ export async function POST(request: Request) {
   }
 
   const result =
-    createDiaryEntrySchema.safeParse(requestBody);
+    createDiaryEntrySchema.safeParse(
+      requestBody,
+    );
 
   if (!result.success) {
     return NextResponse.json(
@@ -45,7 +53,8 @@ export async function POST(request: Request) {
         message:
           result.error.issues[0]?.message ??
           "Invalid diary entry.",
-        errors: result.error.flatten().fieldErrors,
+        errors:
+          result.error.flatten().fieldErrors,
       },
       {
         status: 422,
@@ -69,7 +78,8 @@ export async function POST(request: Request) {
   if (!user?.username) {
     return NextResponse.json(
       {
-        message: "User account was not found.",
+        message:
+          "User account was not found.",
       },
       {
         status: 404,
@@ -89,7 +99,12 @@ export async function POST(request: Request) {
     reviewIsPublic,
   } = result.data;
 
-  const hasReview = review.length > 0;
+  const normalizedReview = review.trim();
+  const normalizedPrivateNotes =
+    privateNotes.trim();
+
+  const hasReview =
+    normalizedReview.length > 0;
 
   try {
     const media = await getTmdbTitleDetails(
@@ -109,9 +124,14 @@ export async function POST(request: Request) {
             `${watchedAt}T12:00:00.000Z`,
           ),
           rating,
-          review: hasReview ? review : null,
-          privateNotes: privateNotes || null,
-          spoiler: hasReview ? spoiler : false,
+          review: hasReview
+            ? normalizedReview
+            : null,
+          privateNotes:
+            normalizedPrivateNotes || null,
+          spoiler: hasReview
+            ? spoiler
+            : false,
           isPublic,
           reviewIsPublic:
             hasReview && isPublic
@@ -121,12 +141,36 @@ export async function POST(request: Request) {
         select: {
           id: true,
           title: true,
+          isPublic: true,
         },
       });
 
+    if (diaryEntry.isPublic) {
+      try {
+        await notifyFollowersAboutDiary({
+          actorId: user.id,
+          diaryEntryId: diaryEntry.id,
+        });
+      } catch (notificationError) {
+        console.error(
+          "Failed to notify followers about diary:",
+          notificationError,
+        );
+      }
+    }
+
     revalidatePath("/home");
     revalidatePath("/diary");
-    revalidatePath(`/u/${user.username}`);
+    revalidatePath(
+      `/diary/${diaryEntry.id}`,
+    );
+    revalidatePath(
+      `/u/${user.username}`,
+    );
+
+    if (diaryEntry.isPublic) {
+      revalidatePath("/notifications");
+    }
 
     return NextResponse.json(
       {
@@ -145,7 +189,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        message: "Unable to save this diary entry.",
+        message:
+          "Unable to save this diary entry.",
       },
       {
         status: 500,

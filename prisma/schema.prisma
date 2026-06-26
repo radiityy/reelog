@@ -29,6 +29,13 @@ enum FollowStatus {
   REJECTED
 }
 
+enum NotificationType {
+  FOLLOW_REQUEST
+  FOLLOW_ACCEPTED
+  NEW_FOLLOWER
+  DIARY_PUBLISHED
+}
+
 model User {
   id    String  @id @default(cuid())
   name  String?
@@ -62,6 +69,9 @@ model User {
   followers Follow[] @relation("UserFollowers")
   following Follow[] @relation("UserFollowing")
 
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+  sentNotifications     Notification[] @relation("NotificationActor")
+
   @@index([role])
   @@index([deletedAt])
   @@index([suspendedAt])
@@ -86,6 +96,28 @@ model Follow {
   @@index([followerId, status])
   @@index([followingId, status])
   @@index([followingId, requestedAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  recipientId String
+  actorId     String?
+
+  type NotificationType
+
+  entityId String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User? @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, readAt, createdAt])
+  @@index([recipientId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([type, createdAt])
 }
 
 model DiaryEntry {
