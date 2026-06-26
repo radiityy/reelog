@@ -1,19 +1,20 @@
 "use client";
 
+import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   useEffect,
   useRef,
   useState,
 } from "react";
-import { signOut } from "next-auth/react";
-import { usePathname } from "next/navigation";
 
 type UserMenuProps = {
   username: string;
   name?: string | null;
   image?: string | null;
   followRequestCount?: number;
+  notificationUnreadCount?: number;
 };
 
 export function UserMenu({
@@ -21,6 +22,7 @@ export function UserMenu({
   name,
   image,
   followRequestCount = 0,
+  notificationUnreadCount = 0,
 }: UserMenuProps) {
   const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -32,6 +34,16 @@ export function UserMenu({
   const requestCount = Math.max(
     followRequestCount,
     0,
+  );
+
+  const unreadCount = Math.max(
+    notificationUnreadCount,
+    0,
+  );
+
+  const accountBadgeCount = Math.max(
+    requestCount,
+    unreadCount,
   );
 
   const avatarInitial = username
@@ -115,9 +127,9 @@ export function UserMenu({
                 {!image ? avatarInitial : null}
               </span>
 
-              {requestCount > 0 ? (
+              {accountBadgeCount > 0 ? (
                 <NotificationBadge
-                  count={requestCount}
+                  count={accountBadgeCount}
                   className="-right-1 -top-1"
                 />
               ) : null}
@@ -144,6 +156,20 @@ export function UserMenu({
             </Link>
 
             <Link
+              href="/notifications"
+              className="mt-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-[#C9C4BC] transition hover:bg-[#292521] hover:text-[#F4F1EB]"
+            >
+              <span className="flex items-center gap-3">
+                <BellIcon className="h-4 w-4" />
+                Notifications
+              </span>
+
+              {unreadCount > 0 ? (
+                <MenuBadge count={unreadCount} />
+              ) : null}
+            </Link>
+
+            <Link
               href="/follow-requests"
               className="mt-1 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-[#C9C4BC] transition hover:bg-[#292521] hover:text-[#F4F1EB]"
             >
@@ -153,9 +179,7 @@ export function UserMenu({
               </span>
 
               {requestCount > 0 ? (
-                <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
-                  {formatBadgeCount(requestCount)}
-                </span>
+                <MenuBadge count={requestCount} />
               ) : null}
             </Link>
 
@@ -208,9 +232,9 @@ export function UserMenu({
             {!image ? avatarInitial : null}
           </span>
 
-          {requestCount > 0 ? (
+          {accountBadgeCount > 0 ? (
             <NotificationBadge
-              count={requestCount}
+              count={accountBadgeCount}
               className="-right-1.5 -top-1.5"
             />
           ) : null}
@@ -256,8 +280,43 @@ function NotificationBadge({
   );
 }
 
+function MenuBadge({
+  count,
+}: {
+  count: number;
+}) {
+  return (
+    <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
+      {formatBadgeCount(count)}
+    </span>
+  );
+}
+
 function formatBadgeCount(count: number) {
   return count > 99 ? "99+" : count.toString();
+}
+
+function BellIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function FollowRequestsIcon({

@@ -1,12 +1,13 @@
 "use client";
 
+import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   useEffect,
   useRef,
   useState,
 } from "react";
-import { signOut } from "next-auth/react";
 
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 
@@ -22,6 +23,7 @@ type AppHeaderProps = {
   name?: string | null;
   image?: string | null;
   followRequestCount?: number;
+  notificationUnreadCount?: number;
 };
 
 export function AppHeader({
@@ -30,7 +32,9 @@ export function AppHeader({
   name,
   image,
   followRequestCount = 0,
+  notificationUnreadCount = 0,
 }: AppHeaderProps) {
+  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [isMenuOpen, setIsMenuOpen] =
@@ -42,6 +46,16 @@ export function AppHeader({
   const requestCount = Math.max(
     followRequestCount,
     0,
+  );
+
+  const unreadCount = Math.max(
+    notificationUnreadCount,
+    0,
+  );
+
+  const accountBadgeCount = Math.max(
+    requestCount,
+    unreadCount,
   );
 
   const resolvedUsername =
@@ -64,6 +78,10 @@ export function AppHeader({
   )
     .charAt(0)
     .toUpperCase();
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -158,12 +176,10 @@ export function AppHeader({
                   : null}
               </span>
 
-              {requestCount > 0 ? (
-                <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#100E0C] bg-[#C84B18] px-1 text-[9px] font-bold leading-none text-white">
-                  {formatBadgeCount(
-                    requestCount,
-                  )}
-                </span>
+              {accountBadgeCount > 0 ? (
+                <NotificationBadge
+                  count={accountBadgeCount}
+                />
               ) : null}
             </span>
 
@@ -184,7 +200,7 @@ export function AppHeader({
           {isMenuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-[calc(100%+10px)] w-60 overflow-hidden rounded-xl border border-[#302C28] bg-[#1A1714] p-2 shadow-2xl shadow-black/50"
+              className="absolute right-0 top-[calc(100%+10px)] w-64 overflow-hidden rounded-xl border border-[#302C28] bg-[#1A1714] p-2 shadow-2xl shadow-black/50"
             >
               <div className="border-b border-[#302C28] px-3 py-3">
                 <p className="truncate text-sm font-semibold text-[#F4F1EB]">
@@ -213,6 +229,24 @@ export function AppHeader({
               ) : null}
 
               <Link
+                href="/notifications"
+                role="menuitem"
+                onClick={closeMenu}
+                className="mt-1 flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-[#C9C4BC] transition hover:bg-[#292521] hover:text-[#F4F1EB]"
+              >
+                <span className="flex items-center gap-3">
+                  <BellIcon className="h-4 w-4" />
+                  Notifications
+                </span>
+
+                {unreadCount > 0 ? (
+                  <MenuBadge
+                    count={unreadCount}
+                  />
+                ) : null}
+              </Link>
+
+              <Link
                 href="/follow-requests"
                 role="menuitem"
                 onClick={closeMenu}
@@ -224,11 +258,9 @@ export function AppHeader({
                 </span>
 
                 {requestCount > 0 ? (
-                  <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
-                    {formatBadgeCount(
-                      requestCount,
-                    )}
-                  </span>
+                  <MenuBadge
+                    count={requestCount}
+                  />
                 ) : null}
               </Link>
 
@@ -265,8 +297,55 @@ export function AppHeader({
   );
 }
 
+function NotificationBadge({
+  count,
+}: {
+  count: number;
+}) {
+  return (
+    <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#100E0C] bg-[#C84B18] px-1 text-[9px] font-bold leading-none text-white">
+      {formatBadgeCount(count)}
+    </span>
+  );
+}
+
+function MenuBadge({
+  count,
+}: {
+  count: number;
+}) {
+  return (
+    <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#C84B18] px-1.5 text-[9px] font-bold text-white">
+      {formatBadgeCount(count)}
+    </span>
+  );
+}
+
 function formatBadgeCount(count: number) {
   return count > 99 ? "99+" : count.toString();
+}
+
+function BellIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function FollowRequestsIcon({

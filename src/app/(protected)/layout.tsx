@@ -1,8 +1,8 @@
 import { FollowStatus } from "@prisma/client";
-import type { ReactNode } from "react";
-import Link from "next/link";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/app/AppHeader";
 import { AppNavigation } from "@/components/app/AppNavigation";
@@ -58,8 +58,11 @@ export default async function ProtectedLayout({
     user.image,
   );
 
-  const followRequestCount =
-    await prisma.follow.count({
+  const [
+    followRequestCount,
+    notificationUnreadCount,
+  ] = await Promise.all([
+    prisma.follow.count({
       where: {
         followingId: user.id,
         status: FollowStatus.PENDING,
@@ -69,7 +72,15 @@ export default async function ProtectedLayout({
           suspendedAt: null,
         },
       },
-    });
+    }),
+
+    prisma.notification.count({
+      where: {
+        recipientId: user.id,
+        readAt: null,
+      },
+    }),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#080706] text-[#EDE8DE]">
@@ -96,6 +107,9 @@ export default async function ProtectedLayout({
           followRequestCount={
             followRequestCount
           }
+          notificationUnreadCount={
+            notificationUnreadCount
+          }
         />
       </aside>
 
@@ -106,6 +120,9 @@ export default async function ProtectedLayout({
           image={avatarUrl}
           followRequestCount={
             followRequestCount
+          }
+          notificationUnreadCount={
+            notificationUnreadCount
           }
         />
 
