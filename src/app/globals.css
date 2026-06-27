@@ -40,3 +40,12 @@ body {
   background: rgba(200, 75, 24, 0.35);
   color: #ede8de;
 }
+
+.scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

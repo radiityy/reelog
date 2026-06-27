@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { WatchlistButton } from "@/components/watchlist/WatchlistButton";
@@ -11,37 +11,14 @@ import {
   type TmdbSearchResult,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 type SearchPageProps = {
   searchParams?: {
     q?: string | string[];
     page?: string | string[];
   };
 };
-
-function getParam(value: string | string[] | undefined) {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-
-  return value ?? "";
-}
-
-function getPageNumber(value: string | string[] | undefined) {
-  const page = Number(getParam(value));
-
-  if (!Number.isInteger(page) || page < 1) {
-    return 1;
-  }
-
-  return page;
-}
-
-function getMediaKey(
-  mediaType: "movie" | "tv",
-  tmdbId: number,
-) {
-  return `${mediaType}:${tmdbId}`;
-}
 
 export default async function SearchPage({
   searchParams,
@@ -104,13 +81,18 @@ export default async function SearchPage({
         </h1>
 
         <p className="mt-2 text-sm text-[#8A8580]">
-          Find films and series to add to your diary or watchlist.
+          Find films and series, view their details, then add them to
+          your diary, watchlist, or Top 5.
         </p>
       </section>
 
       {!query ? (
         <div className="mt-10 rounded-xl border border-dashed border-[#302C28] bg-[#171411] px-6 py-16 text-center">
-          <h2 className="text-lg font-semibold text-[#F4F1EB]">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#302C28] bg-[#211E1B] text-[#8A8580]">
+            <SearchIcon className="h-5 w-5" />
+          </span>
+
+          <h2 className="mt-4 text-lg font-semibold text-[#F4F1EB]">
             Search from the bar above
           </h2>
 
@@ -134,19 +116,21 @@ export default async function SearchPage({
 
       {query && result && !errorMessage ? (
         <section className="mt-10">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-sm text-[#8A8580]">
                 Search results for
               </p>
 
-              <h2 className="mt-1 text-2xl font-bold text-[#F4F1EB]">
+              <h2 className="mt-1 break-words text-2xl font-bold text-[#F4F1EB]">
                 “{query}”
               </h2>
             </div>
 
             <p className="text-xs text-[#625D58]">
-              {result.results.length} titles on this page
+              {result.results.length}{" "}
+              {result.results.length === 1 ? "title" : "titles"} on
+              this page
             </p>
           </div>
 
@@ -157,7 +141,7 @@ export default async function SearchPage({
               </h3>
 
               <p className="mt-2 text-sm text-[#8A8580]">
-                Try another title.
+                Try searching with another title.
               </p>
             </div>
           ) : (
@@ -185,8 +169,8 @@ export default async function SearchPage({
       ) : null}
 
       <p className="mt-12 text-center text-[11px] text-[#625D58]">
-        This product uses the TMDB API but is not endorsed or certified by
-        TMDB.
+        This product uses the TMDB API but is not endorsed or
+        certified by TMDB.
       </p>
     </div>
   );
@@ -199,6 +183,7 @@ function SearchResultCard({
   item: TmdbSearchResult;
   isSaved: boolean;
 }) {
+  const detailsHref = `/title/${item.mediaType}/${item.id}`;
   const posterUrl = getTmdbPosterUrl(item.posterPath);
 
   const releaseYear = item.releaseDate
@@ -206,65 +191,79 @@ function SearchResultCard({
     : "Unknown";
 
   return (
-    <article className="group min-w-0 rounded-lg bg-[#211E1B] p-3 transition hover:-translate-y-1 hover:bg-[#2A2622]">
-      <div
-        className="relative aspect-[2/3] overflow-hidden rounded-md bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20"
-        style={
-          posterUrl
-            ? {
-                backgroundImage: `url("${posterUrl}")`,
-              }
-            : undefined
-        }
+    <article className="group min-w-0 overflow-hidden rounded-xl border border-transparent bg-[#211E1B] p-3 transition duration-200 hover:-translate-y-1 hover:border-[#38332E] hover:bg-[#2A2622] hover:shadow-xl hover:shadow-black/30">
+      <Link
+        href={detailsHref}
+        aria-label={`View details for ${item.title}`}
+        className="block"
       >
-        {!posterUrl ? (
-          <div className="flex h-full items-center justify-center px-4 text-center">
-            <span className="text-sm font-semibold text-[#8A8580]">
-              {item.title}
+        <div
+          className="relative aspect-[2/3] overflow-hidden rounded-lg bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-lg shadow-black/20"
+          style={
+            posterUrl
+              ? {
+                  backgroundImage: `url("${posterUrl}")`,
+                }
+              : undefined
+          }
+        >
+          {!posterUrl ? (
+            <div className="flex h-full items-center justify-center px-4 text-center">
+              <span className="text-sm font-semibold text-[#8A8580]">
+                {item.title}
+              </span>
+            </div>
+          ) : null}
+
+          <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[9px] font-medium text-white backdrop-blur-sm">
+            {item.mediaType === "movie" ? "Film" : "Series"}
+          </span>
+
+          {item.rating > 0 ? (
+            <span className="absolute right-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[9px] font-medium text-[#F4C95D] backdrop-blur-sm">
+              ★ {item.rating.toFixed(1)}
+            </span>
+          ) : null}
+
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition duration-200 group-hover:opacity-100">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur-sm">
+              <EyeIcon className="h-5 w-5" />
             </span>
           </div>
-        ) : null}
 
-        <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[9px] font-medium text-white">
-          {item.mediaType === "movie" ? "Film" : "Series"}
-        </span>
-
-        {item.rating > 0 ? (
-          <span className="absolute right-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[9px] font-medium text-[#F4C95D]">
-            ★ {item.rating.toFixed(1)}
-          </span>
-        ) : null}
-
-        <div className="absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black via-black/90 to-transparent px-3 pb-3 pt-14 transition duration-300 group-hover:translate-y-0">
-          <p className="line-clamp-4 text-[11px] leading-5 text-white/75">
-            {item.overview || "No overview available."}
-          </p>
+          <div className="absolute inset-x-0 bottom-0 translate-y-full bg-gradient-to-t from-black via-black/90 to-transparent px-3 pb-3 pt-16 transition duration-300 group-hover:translate-y-0">
+            <p className="line-clamp-3 text-[11px] leading-5 text-white/75">
+              {item.overview || "No overview available."}
+            </p>
+          </div>
         </div>
-      </div>
+      </Link>
 
-      <h3
+      <Link
+        href={detailsHref}
         title={item.title}
-        className="mt-3 truncate text-sm font-semibold text-[#F4F1EB]"
+        className="mt-3 block truncate text-sm font-semibold text-[#F4F1EB] transition hover:text-[#E45A1C]"
       >
         {item.title}
-      </h3>
+      </Link>
 
       <div className="mt-1 flex items-center justify-between gap-2">
-        <span className="text-xs text-[#8A8580]">
+        <span className="truncate text-xs text-[#8A8580]">
           {releaseYear}
         </span>
 
-        <span className="text-[10px] uppercase text-[#625D58]">
+        <span className="shrink-0 text-[10px] uppercase text-[#625D58]">
           {item.mediaType === "movie" ? "Movie" : "TV"}
         </span>
       </div>
 
       <div className="mt-3 space-y-2">
         <Link
-          href={`/log/${item.mediaType}/${item.id}`}
-          className="block w-full rounded-full border border-[#C84B18]/50 px-3 py-2 text-center text-xs font-medium text-[#C84B18] transition hover:bg-[#C84B18] hover:text-white"
+          href={detailsHref}
+          className="flex w-full items-center justify-center gap-2 rounded-full border border-[#C84B18]/50 px-3 py-2 text-center text-xs font-semibold text-[#E45A1C] transition hover:border-[#C84B18] hover:bg-[#C84B18] hover:text-white"
         >
-          Log this title
+          View details
+          <ArrowIcon className="h-3.5 w-3.5" />
         </Link>
 
         <WatchlistButton
@@ -291,13 +290,16 @@ function Pagination({
   const maximumPage = Math.min(totalPages, 500);
 
   return (
-    <div className="mt-10 flex items-center justify-center gap-4">
+    <nav
+      aria-label="Search result pages"
+      className="mt-10 flex flex-wrap items-center justify-center gap-4"
+    >
       {currentPage > 1 ? (
         <Link
           href={`/search?q=${encodeURIComponent(query)}&page=${
             currentPage - 1
           }`}
-          className="rounded-full border border-[#302C28] px-5 py-2.5 text-sm text-[#C9C4BC]"
+          className="rounded-full border border-[#302C28] px-5 py-2.5 text-sm text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
         >
           ← Previous
         </Link>
@@ -312,11 +314,119 @@ function Pagination({
           href={`/search?q=${encodeURIComponent(query)}&page=${
             currentPage + 1
           }`}
-          className="rounded-full border border-[#302C28] px-5 py-2.5 text-sm text-[#C9C4BC]"
+          className="rounded-full border border-[#302C28] px-5 py-2.5 text-sm text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#F4F1EB]"
         >
           Next →
         </Link>
       ) : null}
-    </div>
+    </nav>
+  );
+}
+
+function getParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function getPageNumber(value: string | string[] | undefined) {
+  const page = Number(getParam(value));
+
+  if (!Number.isInteger(page) || page < 1) {
+    return 1;
+  }
+
+  return page;
+}
+
+function getMediaKey(
+  mediaType: "movie" | "tv",
+  tmdbId: number,
+) {
+  return `${mediaType}:${tmdbId}`;
+}
+
+function SearchIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle
+        cx="11"
+        cy="11"
+        r="6.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+
+      <path
+        d="m16 16 4 4"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="M2.8 12s3.3-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.3 5.5-9.2 5.5S2.8 12 2.8 12Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+
+      <circle
+        cx="12"
+        cy="12"
+        r="2.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function ArrowIcon({
+  className = "",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        d="m9 6 6 6-6 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
