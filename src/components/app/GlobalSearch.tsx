@@ -291,7 +291,7 @@ export function GlobalSearch() {
   useEffect(() => {
     for (const title of titles) {
       router.prefetch(
-        `/log/${title.mediaType}/${title.id}`,
+        `/title/${title.mediaType}/${title.id}`,
       );
     }
 
@@ -332,7 +332,7 @@ export function GlobalSearch() {
           key: `title:${title.mediaType}:${title.id}`,
           kind: "title",
           data: title,
-          href: `/log/${title.mediaType}/${title.id}`,
+          href: `/title/${title.mediaType}/${title.id}`,
         });
       }
 
@@ -699,7 +699,7 @@ export function GlobalSearch() {
                             }
                             onPrefetch={() =>
                               router.prefetch(
-                                `/log/${title.mediaType}/${title.id}`,
+                                `/title/${title.mediaType}/${title.id}`,
                               )
                             }
                             onClick={() => {

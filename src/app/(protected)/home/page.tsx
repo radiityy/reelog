@@ -112,9 +112,8 @@ export default async function HomePage() {
           </h1>
 
           <p className="mt-3 max-w-xl text-sm leading-6 text-[#8A8580]">
-            Search for something you watched,
-            save what comes next, or continue
-            building your diary.
+            Search for something you watched, save what comes next,
+            or continue building your diary.
           </p>
         </div>
 
@@ -144,6 +143,7 @@ export default async function HomePage() {
           label="Top films"
           value={`${featuredCount}/5`}
           description="Your curated favorites."
+          href="/featured-films"
         />
 
         <Link
@@ -156,8 +156,7 @@ export default async function HomePage() {
             </p>
 
             <p className="mt-2 text-xs leading-5 text-[#8A8580]">
-              Find films and series to add to
-              Reelog.
+              Find films and series to add to Reelog.
             </p>
           </div>
 
@@ -195,11 +194,7 @@ export default async function HomePage() {
                     ? `${entry.rating} / 5`
                     : "Not rated"
                 }
-                badge={
-                  entry.isPublic
-                    ? "Public"
-                    : "Private"
-                }
+                badge={entry.isPublic ? "Public" : "Private"}
               />
             ))}
           </div>
@@ -241,15 +236,17 @@ type DashboardCardProps = {
   label: string;
   value: number | string;
   description: string;
+  href?: string;
 };
 
 function DashboardCard({
   label,
   value,
   description,
+  href,
 }: DashboardCardProps) {
-  return (
-    <article className="flex min-h-32 flex-col justify-between rounded-lg bg-[#211E1B] p-5">
+  const content = (
+    <>
       <div>
         <p className="text-sm font-semibold text-[#F4F1EB]">
           {label}
@@ -260,9 +257,34 @@ function DashboardCard({
         </p>
       </div>
 
-      <p className="mt-4 text-3xl font-bold text-[#C84B18]">
-        {value}
-      </p>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <p className="text-3xl font-bold text-[#C84B18]">
+          {value}
+        </p>
+
+        {href ? (
+          <span className="text-xl text-[#716B65] transition group-hover:translate-x-1 group-hover:text-[#E45A1C]">
+            →
+          </span>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="group flex min-h-32 flex-col justify-between rounded-lg bg-[#211E1B] p-5 transition hover:-translate-y-0.5 hover:bg-[#2A2622]"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <article className="flex min-h-32 flex-col justify-between rounded-lg bg-[#211E1B] p-5">
+      {content}
     </article>
   );
 }
@@ -378,9 +400,7 @@ function MediaCard({
         </span>
 
         <span className="shrink-0 text-[10px] uppercase text-[#625D58]">
-          {mediaType === "movie"
-            ? "Film"
-            : "Series"}
+          {mediaType === "movie" ? "Film" : "Series"}
         </span>
       </div>
     </article>

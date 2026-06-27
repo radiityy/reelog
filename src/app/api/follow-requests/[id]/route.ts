@@ -22,10 +22,6 @@ type RouteContext = {
   };
 };
 
-type FollowRequestAction =
-  | "accept"
-  | "reject";
-
 export async function PATCH(
   request: Request,
   { params }: RouteContext,
