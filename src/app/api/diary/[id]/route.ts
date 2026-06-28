@@ -128,6 +128,7 @@ export async function PATCH(
   const {
     watchedAt,
     rating,
+    isRewatch,
     review,
     privateNotes,
     spoiler,
@@ -153,6 +154,7 @@ export async function PATCH(
             `${watchedAt}T12:00:00.000Z`,
           ),
           rating,
+          isRewatch,
           review: hasReview
             ? normalizedReview
             : null,

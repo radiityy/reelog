@@ -29,6 +29,7 @@ const ratingSchema = z
 const editableDiaryFields = {
   watchedAt: watchedDateSchema,
   rating: ratingSchema,
+  isRewatch: z.boolean(),
   review: z
     .string()
     .trim()

@@ -136,6 +136,7 @@ model DiaryEntry {
   review       String? @db.VarChar(1000)
   privateNotes String? @db.VarChar(1000)
   spoiler      Boolean @default(false)
+  isRewatch    Boolean @default(false)
 
   isPublic       Boolean @default(false)
   reviewIsPublic Boolean @default(false)

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { DeleteDiaryEntryButton } from "@/components/diary/DeleteDiaryEntryButton";
@@ -7,6 +7,8 @@ import { FormattedReview } from "@/components/diary/FormattedReview";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTmdbPosterUrl } from "@/lib/tmdb";
+
+export const dynamic = "force-dynamic";
 
 type DiaryDetailPageProps = {
   params: {
@@ -31,11 +33,13 @@ export default async function DiaryDetailPage({
     },
     select: {
       id: true,
+      tmdbId: true,
       title: true,
       posterPath: true,
       mediaType: true,
       watchedAt: true,
       rating: true,
+      isRewatch: true,
       review: true,
       privateNotes: true,
       spoiler: true,
@@ -59,6 +63,13 @@ export default async function DiaryDetailPage({
     timeZone: "UTC",
   }).format(entry.watchedAt);
 
+  const createdDate = new Intl.DateTimeFormat("en", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(entry.createdAt);
+
   const updatedDate = new Intl.DateTimeFormat("en", {
     day: "2-digit",
     month: "short",
@@ -79,6 +90,13 @@ export default async function DiaryDetailPage({
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
+            href={`/title/${entry.mediaType}/${entry.tmdbId}`}
+            className="inline-flex rounded-full border border-[#302C28] px-5 py-2.5 text-sm font-medium text-[#C9C4BC] transition hover:border-[#48413B] hover:text-[#F4F1EB]"
+          >
+            View title
+          </Link>
+
+          <Link
             href={`/diary/${entry.id}/edit`}
             className="inline-flex rounded-full bg-[#C84B18] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#DC5520]"
           >
@@ -92,26 +110,32 @@ export default async function DiaryDetailPage({
         </div>
       </div>
 
-      <div className="mt-7 grid gap-8 lg:grid-cols-[260px_1fr]">
+      <div className="mt-7 grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside>
-          <div
-            className="aspect-[2/3] overflow-hidden rounded-xl bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-2xl shadow-black/30"
-            style={
-              posterUrl
-                ? {
-                    backgroundImage: `url("${posterUrl}")`,
-                  }
-                : undefined
-            }
+          <Link
+            href={`/title/${entry.mediaType}/${entry.tmdbId}`}
+            aria-label={`View details for ${entry.title}`}
+            className="group block"
           >
-            {!posterUrl ? (
-              <div className="flex h-full items-center justify-center p-6 text-center">
-                <span className="text-lg font-semibold text-[#8A8580]">
-                  {entry.title}
-                </span>
-              </div>
-            ) : null}
-          </div>
+            <div
+              className="aspect-[2/3] overflow-hidden rounded-xl border border-[#302C28] bg-gradient-to-br from-[#3A2419] to-[#171411] bg-cover bg-center shadow-2xl shadow-black/30 transition duration-200 group-hover:-translate-y-1 group-hover:border-[#48413B]"
+              style={
+                posterUrl
+                  ? {
+                      backgroundImage: `url("${posterUrl}")`,
+                    }
+                  : undefined
+              }
+            >
+              {!posterUrl ? (
+                <div className="flex h-full items-center justify-center p-6 text-center">
+                  <span className="text-lg font-semibold text-[#8A8580]">
+                    {entry.title}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </Link>
         </aside>
 
         <main className="min-w-0">
@@ -121,6 +145,16 @@ export default async function DiaryDetailPage({
                 <span className="rounded-full bg-[#211E1B] px-3 py-1 text-[10px] uppercase tracking-wide text-[#8A8580]">
                   {entry.mediaType === "movie" ? "Film" : "Series"}
                 </span>
+
+                {entry.isRewatch ? (
+                  <span className="rounded-full bg-[#E45A1C]/15 px-3 py-1 text-[9px] uppercase tracking-wide text-[#E45A1C]">
+                    Rewatch
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#211E1B] px-3 py-1 text-[9px] uppercase tracking-wide text-[#625D58]">
+                    First watch
+                  </span>
+                )}
 
                 <VisibilityBadge
                   label="Diary"
@@ -139,7 +173,7 @@ export default async function DiaryDetailPage({
                 )}
               </div>
 
-              <h1 className="mt-4 text-3xl font-bold tracking-tight text-[#F4F1EB] md:text-4xl">
+              <h1 className="mt-4 break-words text-3xl font-bold tracking-tight text-[#F4F1EB] md:text-4xl">
                 {entry.title}
               </h1>
 
@@ -154,7 +188,7 @@ export default async function DiaryDetailPage({
               </p>
 
               <p className="mt-1 text-xl font-semibold text-[#E45A1C]">
-                {entry.rating
+                {entry.rating !== null
                   ? `${entry.rating.toFixed(1)} / 5`
                   : "Not rated"}
               </p>
@@ -222,7 +256,7 @@ export default async function DiaryDetailPage({
             </div>
           </section>
 
-          <section className="mt-5 grid gap-4 rounded-xl border border-[#302C28] bg-[#171411] p-5 sm:grid-cols-3">
+          <section className="mt-5 grid gap-4 rounded-xl border border-[#302C28] bg-[#171411] p-5 sm:grid-cols-2 xl:grid-cols-4">
             <DetailItem
               label="Diary visibility"
               value={entry.isPublic ? "Public" : "Private"}
@@ -237,6 +271,21 @@ export default async function DiaryDetailPage({
                     : "Private"
                   : "No review"
               }
+            />
+
+            <DetailItem
+              label="Viewing type"
+              value={entry.isRewatch ? "Rewatch" : "First watch"}
+            />
+
+            <DetailItem
+              label="Watched date"
+              value={watchedDate}
+            />
+
+            <DetailItem
+              label="Created"
+              value={createdDate}
             />
 
             <DetailItem

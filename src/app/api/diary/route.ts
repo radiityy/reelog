@@ -92,6 +92,7 @@ export async function POST(request: Request) {
     mediaType,
     watchedAt,
     rating,
+    isRewatch,
     review,
     privateNotes,
     spoiler,
@@ -114,30 +115,31 @@ export async function POST(request: Request) {
 
     const diaryEntry =
       await prisma.diaryEntry.create({
-        data: {
-          userId: user.id,
-          tmdbId: media.id,
-          mediaType: media.mediaType,
-          title: media.title,
-          posterPath: media.posterPath,
-          watchedAt: new Date(
-            `${watchedAt}T12:00:00.000Z`,
-          ),
-          rating,
-          review: hasReview
-            ? normalizedReview
-            : null,
-          privateNotes:
-            normalizedPrivateNotes || null,
-          spoiler: hasReview
-            ? spoiler
-            : false,
-          isPublic,
-          reviewIsPublic:
-            hasReview && isPublic
-              ? reviewIsPublic
+          data: {
+            userId: user.id,
+            tmdbId: media.id,
+            mediaType: media.mediaType,
+            title: media.title,
+            posterPath: media.posterPath,
+            watchedAt: new Date(
+              `${watchedAt}T12:00:00.000Z`,
+            ),
+            rating,
+            isRewatch,
+            review: hasReview
+              ? normalizedReview
+              : null,
+            privateNotes:
+              normalizedPrivateNotes || null,
+            spoiler: hasReview
+              ? spoiler
               : false,
-        },
+            isPublic,
+            reviewIsPublic:
+              hasReview && isPublic
+                ? reviewIsPublic
+                : false,
+          },
         select: {
           id: true,
           title: true,

@@ -17,6 +17,7 @@ import {
 type DiaryEntryInitialValues = {
   watchedAt: string;
   rating: number | null;
+  isRewatch: boolean;
   review: string;
   privateNotes: string;
   spoiler: boolean;
@@ -53,6 +54,10 @@ export function DiaryEntryForm({
 
   const [rating, setRating] = useState<number | null>(
     initialValues?.rating ?? null,
+  );
+
+  const [isRewatch, setIsRewatch] = useState(
+  initialValues?.isRewatch ?? false,
   );
 
   const [review, setReview] = useState(
@@ -165,6 +170,7 @@ export function DiaryEntryForm({
     const editablePayload = {
       watchedAt,
       rating,
+      isRewatch,
       review,
       privateNotes,
       spoiler,
@@ -291,6 +297,20 @@ export function DiaryEntryForm({
               disabled={isSubmitting}
             />
           </Field>
+        </div>
+
+        <div className="mt-6">
+          <ToggleOption
+            checked={isRewatch}
+            onChange={setIsRewatch}
+            disabled={isSubmitting}
+            title="This viewing was a rewatch"
+            description={
+              isRewatch
+                ? "You have watched this film or series before."
+                : "Turn this on when this was not your first time watching the title."
+            }
+          />
         </div>
 
         <div className="mt-7">

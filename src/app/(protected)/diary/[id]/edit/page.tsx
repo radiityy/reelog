@@ -9,6 +9,8 @@ import {
   type TmdbTitleDetails,
 } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 type EditDiaryPageProps = {
   params: {
     id: string;
@@ -38,6 +40,7 @@ export default async function EditDiaryPage({
       posterPath: true,
       watchedAt: true,
       rating: true,
+      isRewatch: true,
       review: true,
       privateNotes: true,
       spoiler: true,
@@ -57,7 +60,12 @@ export default async function EditDiaryPage({
       entry.mediaType,
       entry.tmdbId,
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      "Failed to load TMDB details for diary edit:",
+      error,
+    );
+
     media = {
       id: entry.tmdbId,
       mediaType: entry.mediaType,
@@ -84,6 +92,7 @@ export default async function EditDiaryPage({
       initialValues={{
         watchedAt,
         rating: entry.rating,
+        isRewatch: entry.isRewatch,
         review: entry.review ?? "",
         privateNotes: entry.privateNotes ?? "",
         spoiler: entry.spoiler,
