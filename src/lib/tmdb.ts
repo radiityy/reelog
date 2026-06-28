@@ -22,6 +22,11 @@ type TmdbMultiSearchResponse = {
   total_results: number;
 };
 
+type TmdbRawGenre = {
+  id: number;
+  name: string;
+};
+
 type TmdbRawTitleDetails = {
   id: number;
   title?: string;
@@ -32,6 +37,13 @@ type TmdbRawTitleDetails = {
   release_date?: string;
   first_air_date?: string;
   vote_average?: number;
+  vote_count?: number;
+  genres?: TmdbRawGenre[];
+  runtime?: number | null;
+  episode_run_time?: number[];
+  number_of_episodes?: number | null;
+  number_of_seasons?: number | null;
+  status?: string | null;
 };
 
 export type TmdbSearchResult = {
@@ -61,6 +73,13 @@ export type TmdbTitleDetails = {
   backdropPath: string | null;
   releaseDate: string | null;
   rating: number;
+  voteCount: number;
+  genres: string[];
+  runtimeMinutes: number | null;
+  episodeRuntimeMinutes: number | null;
+  numberOfEpisodes: number | null;
+  numberOfSeasons: number | null;
+  status: string | null;
 };
 
 function getTmdbToken() {
@@ -93,21 +112,60 @@ async function fetchTmdb<T>(path: string): Promise<T> {
       body,
     });
 
-    throw new Error(`TMDB request failed with status ${response.status}.`);
+    throw new Error(
+      `TMDB request failed with status ${response.status}.`,
+    );
   }
 
   return (await response.json()) as T;
 }
 
+function getPositiveInteger(value: unknown) {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function getEpisodeRuntime(values: number[] | undefined) {
+  if (!values) {
+    return null;
+  }
+
+  const runtime = values.find(
+    (value) =>
+      Number.isInteger(value) &&
+      value > 0,
+  );
+
+  return runtime ?? null;
+}
+
 export function getTmdbPosterUrl(
   posterPath: string | null,
-  size: "w342" | "w500" = "w342",
+  size: "w342" | "w500" | "w780" = "w342",
 ) {
   if (!posterPath) {
     return null;
   }
 
   return `https://image.tmdb.org/t/p/${size}${posterPath}`;
+}
+
+export function getTmdbBackdropUrl(
+  backdropPath: string | null,
+  size: "w780" | "w1280" | "original" = "w1280",
+) {
+  if (!backdropPath) {
+    return null;
+  }
+
+  return `https://image.tmdb.org/t/p/${size}${backdropPath}`;
 }
 
 export async function searchTmdb(
@@ -142,7 +200,9 @@ export async function searchTmdb(
         item,
       ): item is TmdbRawSearchResult & {
         media_type: TmdbMediaType;
-      } => item.media_type === "movie" || item.media_type === "tv",
+      } =>
+        item.media_type === "movie" ||
+        item.media_type === "tv",
     )
     .map<TmdbSearchResult>((item) => ({
       id: item.id,
@@ -183,6 +243,10 @@ export async function getTmdbTitleDetails(
     `/${mediaType}/${tmdbId}?language=en-US`,
   );
 
+  const genres = (data.genres ?? [])
+    .map((genre) => genre.name.trim())
+    .filter(Boolean);
+
   return {
     id: data.id,
     mediaType,
@@ -201,5 +265,27 @@ export async function getTmdbTitleDetails(
       typeof data.vote_average === "number"
         ? data.vote_average
         : 0,
+    voteCount:
+      typeof data.vote_count === "number"
+        ? data.vote_count
+        : 0,
+    genres,
+    runtimeMinutes:
+      mediaType === "movie"
+        ? getPositiveInteger(data.runtime)
+        : null,
+    episodeRuntimeMinutes:
+      mediaType === "tv"
+        ? getEpisodeRuntime(data.episode_run_time)
+        : null,
+    numberOfEpisodes:
+      mediaType === "tv"
+        ? getPositiveInteger(data.number_of_episodes)
+        : null,
+    numberOfSeasons:
+      mediaType === "tv"
+        ? getPositiveInteger(data.number_of_seasons)
+        : null,
+    status: data.status?.trim() || null,
   };
 }

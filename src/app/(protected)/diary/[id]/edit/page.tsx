@@ -66,16 +66,23 @@ export default async function EditDiaryPage({
       error,
     );
 
-    media = {
-      id: entry.tmdbId,
-      mediaType: entry.mediaType,
-      title: entry.title,
-      overview: "",
-      posterPath: entry.posterPath,
-      backdropPath: null,
-      releaseDate: null,
-      rating: 0,
-    };
+  media = {
+    id: entry.tmdbId,
+    mediaType: entry.mediaType,
+    title: entry.title,
+    overview: "",
+    posterPath: entry.posterPath,
+    backdropPath: null,
+    releaseDate: null,
+    rating: 0,
+    voteCount: 0,
+    genres: [],
+    runtimeMinutes: null,
+    episodeRuntimeMinutes: null,
+    numberOfEpisodes: null,
+    numberOfSeasons: null,
+    status: null,
+  };
   }
 
   const watchedAt = entry.watchedAt
