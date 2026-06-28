@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
@@ -5,6 +6,9 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { updateAccountSettingsSchema } from "@/lib/validation/account-settings";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function PATCH(request: Request) {
   const session = await getServerSession(authOptions);
@@ -35,7 +39,8 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const result = updateAccountSettingsSchema.safeParse(requestBody);
+  const result =
+    updateAccountSettingsSchema.safeParse(requestBody);
 
   if (!result.success) {
     return NextResponse.json(
@@ -64,7 +69,7 @@ export async function PATCH(request: Request) {
     },
   });
 
-  if (!user) {
+  if (!user?.username) {
     return NextResponse.json(
       {
         message: "User account was not found.",
@@ -77,11 +82,45 @@ export async function PATCH(request: Request) {
 
   const {
     name,
+    username,
     bio,
     socialLink,
     isPublic,
     defaultDiaryVisibility,
   } = result.data;
+
+  const previousUsername = user.username;
+
+  if (username !== previousUsername) {
+    const usernameOwner = await prisma.user.findFirst({
+      where: {
+        id: {
+          not: user.id,
+        },
+        username: {
+          equals: username,
+          mode: "insensitive",
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (usernameOwner) {
+      return NextResponse.json(
+        {
+          message: "This username is already in use.",
+          errors: {
+            username: ["This username is already in use."],
+          },
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+  }
 
   try {
     const updatedUser = await prisma.user.update({
@@ -90,6 +129,7 @@ export async function PATCH(request: Request) {
       },
       data: {
         name,
+        username,
         bio: bio || null,
         socialLink: socialLink || null,
         isPublic,
@@ -107,16 +147,39 @@ export async function PATCH(request: Request) {
 
     revalidatePath("/home");
     revalidatePath("/settings");
-
-    if (user.username) {
-      revalidatePath(`/u/${user.username}`);
-    }
+    revalidatePath("/diary");
+    revalidatePath("/watchlist");
+    revalidatePath("/notifications");
+    revalidatePath("/follow-requests");
+    revalidatePath(`/u/${previousUsername}`);
+    revalidatePath(`/u/${updatedUser.username}`);
 
     return NextResponse.json({
-      message: "Account settings updated.",
+      message:
+        username === previousUsername
+          ? "Account settings updated."
+          : "Account settings and username updated.",
       user: updatedUser,
+      profilePath: `/u/${updatedUser.username}`,
     });
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          message: "This username is already in use.",
+          errors: {
+            username: ["This username is already in use."],
+          },
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     console.error("Failed to update account settings:", error);
 
     return NextResponse.json(

@@ -1,29 +1,47 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   type FormEvent,
   type ReactNode,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 
 import { SettingsAvatarEditor } from "@/components/settings/SettingsAvatarEditor";
 
 type DiaryVisibility = "PRIVATE" | "PUBLIC";
 
+type AccountSettingsValues = {
+  name: string;
+  username: string;
+  email: string;
+  image: string | null;
+  hasCustomAvatar: boolean;
+  bio: string;
+  socialLink: string;
+  isPublic: boolean;
+  defaultDiaryVisibility: DiaryVisibility;
+};
+
+type UpdatedUser = {
+  name: string | null;
+  username: string;
+  bio: string | null;
+  socialLink: string | null;
+  isPublic: boolean;
+  defaultDiaryVisibility: DiaryVisibility;
+};
+
+type AccountSettingsResponse = {
+  message?: string;
+  profilePath?: string;
+  user?: UpdatedUser;
+  errors?: Record<string, string[] | undefined>;
+};
+
 type AccountSettingsFormProps = {
-  initialValues: {
-    name: string;
-    username: string;
-    email: string;
-    image: string | null;
-    hasCustomAvatar: boolean;
-    bio: string;
-    socialLink: string;
-    isPublic: boolean;
-    defaultDiaryVisibility: DiaryVisibility;
-  };
+  initialValues: AccountSettingsValues;
 };
 
 export function AccountSettingsForm({
@@ -32,6 +50,12 @@ export function AccountSettingsForm({
   const router = useRouter();
 
   const [name, setName] = useState(initialValues.name);
+  const [username, setUsername] = useState(
+    initialValues.username,
+  );
+  const [savedUsername, setSavedUsername] = useState(
+    initialValues.username,
+  );
   const [bio, setBio] = useState(initialValues.bio);
   const [socialLink, setSocialLink] = useState(
     initialValues.socialLink,
@@ -50,10 +74,21 @@ export function AccountSettingsForm({
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function handleUsernameChange(value: string) {
+    setUsername(
+      value
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "")
+        .slice(0, 24),
+    );
+  }
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+
+    const normalizedUsername = username.trim().toLowerCase();
 
     setErrorMessage("");
     setSuccessMessage("");
@@ -67,6 +102,7 @@ export function AccountSettingsForm({
         },
         body: JSON.stringify({
           name,
+          username: normalizedUsername,
           bio,
           socialLink,
           isPublic,
@@ -74,16 +110,32 @@ export function AccountSettingsForm({
         }),
       });
 
-      const payload = (await response.json()) as {
-        message?: string;
-      };
+      const payload =
+        (await response.json()) as AccountSettingsResponse;
 
       if (!response.ok) {
+        const usernameError =
+          payload.errors?.username?.[0];
+
         setErrorMessage(
-          payload.message ??
+          usernameError ??
+            payload.message ??
             "Unable to update your account settings.",
         );
+
         return;
+      }
+
+      if (payload.user) {
+        setName(payload.user.name ?? "");
+        setUsername(payload.user.username);
+        setSavedUsername(payload.user.username);
+        setBio(payload.user.bio ?? "");
+        setSocialLink(payload.user.socialLink ?? "");
+        setIsPublic(payload.user.isPublic);
+        setDefaultDiaryVisibility(
+          payload.user.defaultDiaryVisibility,
+        );
       }
 
       setSuccessMessage(
@@ -103,7 +155,7 @@ export function AccountSettingsForm({
       <section className="rounded-xl border border-[#2B2723] bg-[#191613] p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <SettingsAvatarEditor
-            username={initialValues.username}
+            username={savedUsername}
             initialAvatarUrl={initialValues.image}
             initialHasCustomAvatar={
               initialValues.hasCustomAvatar
@@ -112,11 +164,11 @@ export function AccountSettingsForm({
 
           <div className="min-w-0">
             <h2 className="truncate text-xl font-semibold text-[#F4F1EB]">
-              {name || `@${initialValues.username}`}
+              {name || `@${savedUsername}`}
             </h2>
 
             <p className="mt-1 text-sm font-medium text-[#E45A1C]">
-              @{initialValues.username}
+              @{savedUsername}
             </p>
 
             <p className="mt-1 truncate text-sm text-[#716B65]">
@@ -124,7 +176,7 @@ export function AccountSettingsForm({
             </p>
 
             <Link
-              href={`/u/${initialValues.username}`}
+              href={`/u/${savedUsername}`}
               className="mt-4 inline-flex rounded-full border border-[#3A3530] px-4 py-2 text-xs font-medium text-[#C9C4BC] transition hover:border-[#C84B18]/60 hover:text-[#E45A1C]"
             >
               View profile
@@ -134,9 +186,9 @@ export function AccountSettingsForm({
 
         <div className="mt-6 grid gap-5 border-t border-[#302C28] pt-6 sm:grid-cols-2">
           <ReadOnlyField
-            label="Username"
-            value={`@${initialValues.username}`}
-            helper="Your username cannot be changed yet."
+            label="Profile URL"
+            value={`/u/${savedUsername}`}
+            helper="This URL changes when you update your username."
           />
 
           <ReadOnlyField
@@ -166,7 +218,9 @@ export function AccountSettingsForm({
             <input
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) =>
+                setName(event.target.value)
+              }
               maxLength={80}
               required
               disabled={isSubmitting}
@@ -175,10 +229,44 @@ export function AccountSettingsForm({
             />
           </Field>
 
+          <Field
+            label="Username"
+            helper={`${username.length}/24`}
+          >
+            <div className="flex overflow-hidden rounded-lg border border-[#302C28] bg-[#100E0C] transition focus-within:border-[#C84B18]">
+              <span className="flex items-center border-r border-[#302C28] px-4 text-sm text-[#625D58]">
+                @
+              </span>
+
+              <input
+                type="text"
+                value={username}
+                onChange={(event) =>
+                  handleUsernameChange(event.target.value)
+                }
+                minLength={3}
+                maxLength={24}
+                required
+                disabled={isSubmitting}
+                autoComplete="username"
+                spellCheck={false}
+                placeholder="username"
+                className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-[#F4F1EB] outline-none placeholder:text-[#625D58] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+
+            <p className="mt-2 text-xs leading-5 text-[#625D58]">
+              Use 3–24 lowercase letters, numbers, or underscores.
+              Changing this also changes your public profile URL.
+            </p>
+          </Field>
+
           <Field label="Bio" helper={`${bio.length}/160`}>
             <textarea
               value={bio}
-              onChange={(event) => setBio(event.target.value)}
+              onChange={(event) =>
+                setBio(event.target.value)
+              }
               maxLength={160}
               rows={4}
               disabled={isSubmitting}
@@ -225,16 +313,16 @@ export function AccountSettingsForm({
             disabled={isSubmitting}
             privateTitle="Private profile"
             publicTitle="Public profile"
-            privateDescription="Other people cannot open your profile, you can still preview it yourself."
-            publicDescription="Anyone with your profile link can view your public diary activity and public reviews."
+            privateDescription="Only approved followers can access your profile activity."
+            publicDescription="Anyone with your profile link can view your public diary activity and reviews."
           />
         </div>
 
         {!isPublic ? (
           <div className="mt-4 rounded-lg border border-[#3A3530] bg-[#100E0C] px-4 py-3">
             <p className="text-xs leading-5 text-[#8A8580]">
-              Public diary entries remain hidden from other people
-              while your profile is private.
+              Public diary entries remain hidden from people who are
+              not approved followers while your profile is private.
             </p>
           </div>
         ) : null}
@@ -246,8 +334,7 @@ export function AccountSettingsForm({
         </h2>
 
         <p className="mt-1 text-sm leading-6 text-[#8A8580]">
-          Choose the initial visibility used when logging a new
-          title.
+          Choose the initial visibility used when logging a new title.
         </p>
 
         <div className="mt-6">
@@ -258,20 +345,26 @@ export function AccountSettingsForm({
             disabled={isSubmitting}
             privateTitle="Private by default"
             publicTitle="Public by default"
-            privateDescription="New diary entries begin as private, uou can still change each entry before saving."
-            publicDescription="New diary entries begin as public, review visibility is still selected separately."
+            privateDescription="New diary entries begin as private. You can still change each entry before saving."
+            publicDescription="New diary entries begin as public. Review visibility is still selected separately."
           />
         </div>
       </section>
 
       {errorMessage ? (
-        <p className="mt-6 rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm text-red-300">
+        <p
+          role="alert"
+          className="mt-6 rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-3 text-sm text-red-300"
+        >
           {errorMessage}
         </p>
       ) : null}
 
       {successMessage ? (
-        <p className="mt-6 rounded-lg border border-emerald-900/50 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-300">
+        <p
+          role="status"
+          className="mt-6 rounded-lg border border-emerald-900/50 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-300"
+        >
           {successMessage}
         </p>
       ) : null}
